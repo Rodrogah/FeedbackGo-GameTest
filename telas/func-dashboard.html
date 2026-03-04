@@ -4,6 +4,40 @@
     <p id="currentDate"></p>
   </div>
 
+  <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 200px;">
+        <h3 style="color: white; border: none; padding: 0; margin-bottom: 10px; font-size: 18px;">
+            <i class="fa-solid fa-medal" style="color: #fbbf24;"></i> Nível <span id="userLevelDisplay">1</span>: <span id="userTitleDisplay" style="opacity: 0.8; font-weight: normal; font-size: 14px;">Iniciante</span>
+        </h3>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 12px; width: 100%; position: relative; overflow: hidden;">
+            <div id="xpProgressBar" style="background: var(--color-primary); height: 100%; width: 0%; transition: width 1s ease-in-out; border-radius: 20px; box-shadow: 0 0 10px var(--color-primary);"></div>
+        </div>
+        <p style="font-size: 12px; margin-top: 8px; opacity: 0.8;">
+            <span id="currentXpDisplay">0</span> / <span id="nextLevelXpDisplay">500</span> XP para o próximo nível
+        </p>
+    </div>
+    
+    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); padding: 15px 25px; border-radius: 12px; text-align: center;">
+        <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; color: var(--color-primary); font-weight: bold;">Saldo Atual</p>
+        <h2 style="margin: 0; font-size: 26px; color: white; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-coins" style="color: #fbbf24;"></i> 
+            <span id="goCoinsDisplay">0</span> 
+        </h2>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 24px; border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.03);">
+      <h3 style="color: var(--color-text-primary); margin-bottom: 15px;">
+          <i class="fa-solid fa-trophy" style="color: #fbbf24; font-size: 22px;"></i> Pódio Mensal - Top 5
+      </h3>
+      <div id="rankingFuncContainer"></div>
+  </div>
+
+  <script>
+      if(typeof window.atualizarPainelGamificacao === 'function') window.atualizarPainelGamificacao();
+      setTimeout(() => { if(typeof renderRankingMensal === 'function') renderRankingMensal('rankingFuncContainer'); }, 500);
+  </script>
+
   <div
     id="employeeAnnouncementCard"
     class="card"

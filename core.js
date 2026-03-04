@@ -1033,3 +1033,63 @@ const observerCalendario = new MutationObserver(() => {
 window.addEventListener('DOMContentLoaded', () => {
   observerCalendario.observe(document.body, { childList: true, subtree: true });
 });
+
+// =======================================================
+// RANKING MENSAL (CÁLCULO E EXIBIÇÃO)
+// =======================================================
+window.renderRankingMensal = function(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth();
+  const anoAtual = hoje.getFullYear();
+
+  // 1. Filtra atividades do mês atual da empresa que deram XP
+  const atividadesMes = activities.filter(a => {
+      if (a.companyId !== currentUser.companyId || !a.xpEarned || !a.date) return false;
+      const dataAtiv = new Date(a.date);
+      return dataAtiv.getMonth() === mesAtual && dataAtiv.getFullYear() === anoAtual;
+  });
+
+  // 2. Soma o XP por usuário
+  const xpPorUsuario = {};
+  atividadesMes.forEach(a => {
+      xpPorUsuario[a.userId] = (xpPorUsuario[a.userId] || 0) + a.xpEarned;
+  });
+
+  // 3. Monta o Array de Ranking
+  let ranking = Object.keys(xpPorUsuario).map(userId => {
+      const u = users.find(x => x.id == userId);
+      return {
+          nome: u ? u.name.split(' ')[0] : 'Membro',
+          xp: xpPorUsuario[userId],
+          avatar: u ? u.name.charAt(0).toUpperCase() : '?'
+      };
+  }).sort((a, b) => b.xp - a.xp).slice(0, 5);
+
+  if (ranking.length === 0) {
+      container.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.6;">Ainda não há pontuação este mês.</div>';
+      return;
+  }
+
+  const premios = [500, 400, 300, 200, 100];
+  const cores = ['#fbbf24', '#94a3b8', '#b45309', '#3b82f6', '#10b981'];
+
+  let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+  ranking.forEach((user, index) => {
+      html += `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-primary); padding: 12px 16px; border-radius: 12px; border-left: 4px solid ${cores[index]};">
+          <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: ${cores[index]}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">${index + 1}º</div>
+              <strong>${user.nome}</strong>
+          </div>
+          <div style="text-align: right;">
+              <span style="display: block; font-weight: 800; color: var(--color-primary);">${user.xp} XP</span>
+              <span style="font-size: 11px; opacity: 0.8;"><i class="fa-solid fa-coins" style="color: #fbbf24;"></i> +${premios[index]} Coins</span>
+          </div>
+      </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+};

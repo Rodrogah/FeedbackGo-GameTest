@@ -968,138 +968,121 @@ if (editUserForm) {
   });
 }
 
-// =========================================================
-// SISTEMA DE DELEGAÇÃO DE TAREFAS (GESTOR DE EQUIPES)
-// =========================================================
-
+// CONFIGURAÇÃO DO FORMULÁRIO DE DELEGAÇÃO (COM DIFICULDADE)
 function setupAdminDelegarForm() {
   const container = document.getElementById('listaCheckFuncionarios');
   if (!container) return;
 
   const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active && u.id !== currentUser.id);
-  
-  if (funcDaEmpresa.length === 0) {
-      container.innerHTML = '<p style="opacity: 0.6; text-align: center; padding: 10px;">Nenhum colaborador encontrado.</p>';
-  } else {
-      container.innerHTML = funcDaEmpresa.map(u => `
-          <label style="display: flex; align-items: center; gap: 10px; padding: 10px; cursor: pointer; border-bottom: 1px solid var(--color-border); margin:0;">
-              <input type="checkbox" name="funcDelegado" value="${u.id}" style="width: 18px; height: 18px; cursor: pointer;">
-              <span style="font-size: 14px;"><strong>${u.name}</strong> <small style="opacity:0.7">(${u.team || 'Sem Equipe'})</small></span>
-          </label>
-      `).join('');
-  }
+  container.innerHTML = funcDaEmpresa.map(u => `
+      <label class="green-dot-item" style="margin-bottom:5px; padding:10px;">
+          <input type="checkbox" name="funcDelegado" value="${u.id}" class="input-hidden">
+          <div style="display:flex; align-items:center; gap:10px;">
+              <div class="dot"></div>
+              <span style="font-size:14px;">${u.name} <small>(${u.team || 'Geral'})</small></span>
+          </div>
+      </label>
+  `).join('');
 
   const form = document.getElementById('formDelegarTarefa');
-  if (!form) return;
   const novoForm = form.cloneNode(true);
   form.parentNode.replaceChild(novoForm, form);
 
-  let arquivosSelecionados = [];
-  const fileInput = novoForm.querySelector('#delegarArquivos');
-  const fileListDisplay = novoForm.querySelector('#delegarArquivosLista');
-
-  if (fileInput) {
-    fileInput.addEventListener('change', function () {
-      const files = Array.from(this.files);
-      if (files.length > 3) {
-        showToast('Máximo de 3 arquivos!', 'error');
-        this.value = '';
-        fileListDisplay.innerHTML = '';
-        arquivosSelecionados = [];
-        return;
-      }
-      arquivosSelecionados = [];
-      fileListDisplay.innerHTML = '';
-
-      for (let i = 0; i < files.length; i++) {
-        if (files[i].size > 1 * 1024 * 1024) {
-          showToast(`O arquivo ${files[i].name} é muito pesado (Máx 1MB)!`, 'error');
-          this.value = '';
-          fileListDisplay.innerHTML = '';
-          arquivosSelecionados = [];
-          return;
-        }
-        arquivosSelecionados.push(files[i]);
-        fileListDisplay.innerHTML += `<div class="custom-file-item" style="font-size:12px; padding:5px 0;"><i class="fa-solid fa-file-lines" style="color: var(--color-info);"></i> ${files[i].name}</div>`;
-      }
-    });
-  }
+  // INJETA O SELECT DE DIFICULDADE NO HTML
+  const areaArquivos = novoForm.querySelector('.file-drop-area').parentNode;
+  const divDif = document.createElement('div');
+  divDif.className = 'form-group';
+  divDif.style.marginTop = "15px";
+  divDif.innerHTML = `
+      <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
+      <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary);">
+          <option value="2">Fácil (Peso 2 - 100 XP)</option>
+          <option value="3" selected>Média (Peso 3 - 150 XP)</option>
+          <option value="4">Difícil (Peso 4 - 200 XP)</option>
+      </select>
+  `;
+  areaArquivos.parentNode.insertBefore(divDif, areaArquivos.nextSibling);
 
   novoForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      
-      const checkboxes = novoForm.querySelectorAll('input[name="funcDelegado"]:checked');
-      if (checkboxes.length === 0) return showToast('Selecione pelo menos um funcionário!', 'error');
+      const selecionados = novoForm.querySelectorAll('input[name="funcDelegado"]:checked');
+      if (selecionados.length === 0) return showToast('Selecione alguém!', 'error');
 
       const btn = novoForm.querySelector('button[type="submit"]');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Enviar...';
       btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Missões...';
 
-      const titulo = document.getElementById('delegarTitulo').value;
-      const descricao = document.getElementById('delegarDescricao').value;
-      const categoria = document.getElementById('delegarCategoria').value;
-      const dataAtual = new Date().toISOString();
-
-      const dispararTarefas = (anexosProntos) => {
-          let promessasFirebase = [];
-          
-          checkboxes.forEach((box, index) => {
-              const userId = parseInt(box.value);
-              const tarefaId = Date.now() + index; 
-              
-              const novaTarefa = {
-                  id: tarefaId,
-                  companyId: currentUser.companyId,
-                  senderId: currentUser.id,
-                  userId: userId,
-                  title: titulo,
-                  description: descricao,
-                  category: categoria,
-                  attachments: anexosProntos || [],
-                  status: 'pendente', 
-                  createdAt: dataAtual
-              };
-
-              promessasFirebase.push(db.collection('tarefas').doc(tarefaId.toString()).set(novaTarefa));
-          });
-
-          Promise.all(promessasFirebase).then(() => {
-              
-              // 🚀 ESPIÃO: REGISTRA A TAREFA DELEGADA
-              if (window.registrarAcao) {
-                  window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'DELEGAR_TAREFA', `Delegou a tarefa: ${titulo}`);
-              }
-
-              showToast('Tarefas enviadas com sucesso!');
-              novoForm.reset();
-              fileListDisplay.innerHTML = ''; 
-              arquivosSelecionados = []; 
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              loadTarefasEnviadas(); 
-          }).catch((err) => {
-              showToast('Erro ao enviar.', 'error');
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-          });
+      const dados = {
+          titulo: document.getElementById('delegarTitulo').value,
+          desc: document.getElementById('delegarDescricao').value,
+          cat: document.getElementById('delegarCategoria').value,
+          dif: parseInt(document.getElementById('delegarDificuldade').value)
       };
 
-      if (arquivosSelecionados && arquivosSelecionados.length > 0) {
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Anexando...';
-          const promessasDeArquivos = arquivosSelecionados.map((file) => {
-              return new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onload = function (evento) { resolve({ name: file.name, url: evento.target.result }); };
-                  reader.readAsDataURL(file);
-              });
-          });
-          Promise.all(promessasDeArquivos).then((anexos) => dispararTarefas(anexos));
-      } else {
-          dispararTarefas([]); 
-      }
+      let promessas = [];
+      selecionados.forEach((box, i) => {
+          const tarefaId = Date.now() + i;
+          promessas.push(db.collection('tarefas').doc(tarefaId.toString()).set({
+              id: tarefaId,
+              companyId: currentUser.companyId,
+              senderId: currentUser.id,
+              userId: parseInt(box.value),
+              title: dados.titulo,
+              description: dados.desc,
+              category: dados.cat,
+              dificuldade: dados.dif,
+              status: 'pendente',
+              createdAt: new Date().toISOString()
+          }));
+      });
+
+      Promise.all(promessas).then(() => {
+          showToast('Missões delegadas com sucesso!');
+          novoForm.reset();
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Tarefa';
+          loadTarefasEnviadas();
+      });
   });
 }
+
+// APROVAÇÃO E DEPÓSITO DE XP/MOEDAS
+window.aprovarTarefaRevisao = function() {
+  const idT = document.getElementById('detalhesTarefaId').value;
+  db.collection('tarefas').doc(idT).get().then(snap => {
+      const t = snap.data();
+      const xpGanho = 50 * (t.dificuldade || 3);
+
+      const p1 = db.collection('tarefas').doc(idT).update({ status: 'concluido' });
+      
+      const p2 = db.collection('atividades').doc(Date.now().toString()).set({
+          ...t, id: Date.now(), date: new Date().toISOString().split('T')[0],
+          status: 'concluido', xpEarned: xpGanho, tarefaVinculadaId: idT
+      });
+
+      const p3 = db.collection('usuarios').doc(t.userId.toString()).get().then(uSnap => {
+          const u = uSnap.data();
+          let newXp = (u.xp || 0) + xpGanho;
+          let oldLevel = u.level || 1;
+          let newLevel = Math.floor(newXp / 500) + 1;
+          let newCoins = u.goCoins || 0;
+
+          if (newLevel > oldLevel) {
+              newCoins += (newLevel - oldLevel) * 100; // +100 por nível
+          }
+
+          return db.collection('usuarios').doc(t.userId.toString()).update({
+              xp: newXp, level: newLevel, goCoins: newCoins
+          });
+      });
+
+      Promise.all([p1, p2, p3]).then(() => {
+          showToast(`Aprovado! +${xpGanho} XP para o colaborador.`);
+          fecharDetalhesTarefa();
+          loadTarefasEnviadas();
+      });
+  });
+};
 
 // 4. Carregar a Tabela de Acompanhamento (Painel do Admin)
 function loadTarefasEnviadas() {
@@ -1252,41 +1235,6 @@ window.abrirDetalhesTarefa = function(idTarefa) {
 
 window.fecharDetalhesTarefa = function() {
   document.getElementById('modalDetalhesTarefa').classList.add('hidden');
-};
-
-window.aprovarTarefaRevisao = function() {
-  const idTarefa = document.getElementById('detalhesTarefaId').value;
-  db.collection('tarefas').doc(idTarefa.toString()).get().then(docSnap => {
-      const t = docSnap.data();
-      const p1 = db.collection('tarefas').doc(idTarefa.toString()).update({ status: 'concluido', feedbackAdmin: firebase.firestore.FieldValue.delete() });
-      
-      const novaAtividade = {
-          id: Date.now(),
-          tarefaVinculadaId: idTarefa.toString(),
-          companyId: t.companyId,
-          userId: t.userId,
-          date: new Date().toISOString().split('T')[0], 
-          category: t.category || 'Tarefa Delegada', 
-          title: t.tituloEntrega || t.title, 
-          description: t.respostaFuncionario || 'Tarefa concluída sem observações.', 
-          status: 'concluido',
-          createdAt: new Date().toISOString(),
-          attachments: t.attachments || [] 
-      };
-      const p2 = db.collection('atividades').doc(novaAtividade.id.toString()).set(novaAtividade);
-
-      Promise.all([p1, p2]).then(() => {
-          
-          // 🚀 ESPIÃO: REGISTRA A APROVAÇÃO (Ação do Admin)
-          if (window.registrarAcao) {
-              window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'CRIAR_ATIVIDADE', `Aprovou e concluiu a tarefa: ${novaAtividade.title}`);
-          }
-
-          showToast('Tarefa Aprovada com Sucesso!');
-          fecharDetalhesTarefa();
-          loadTarefasEnviadas();
-      });
-  });
 };
 
 window.apagarTarefaDelegada = function(idTarefa) {

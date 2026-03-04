@@ -52,25 +52,39 @@ async function showEmployeeSection(sec) {
         }
       }
       renderFuncCharts();
+      
+      if (typeof window.atualizarPainelGamificacao === 'function') {
+          window.atualizarPainelGamificacao();
+      }
+
     } else if (sec === 'new-task') {
+      
+      // 1. Preenche a data de hoje automaticamente
       if (typeof setTodayDate === 'function') setTodayDate('taskDate');
+      
+      // 2. Traz as categorias da empresa
       const catEl = document.getElementById('taskCategory');
       if (catEl && c) {
-          catEl.innerHTML = typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '';
+          catEl.innerHTML = '<option value="" disabled selected>Selecione a categoria...</option>' + 
+             (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
       }
+      
+      // 3. LIGA O BOTÃO DE GUARDAR!
       setupNewTaskForm();
+
     } else if (sec === 'history') {
-      // 🚀 AQUI: Carrega as categorias (agrupadas) no filtro do Histórico!
       const catEl = document.getElementById('empFilterCategory');
       if (catEl && c) {
           catEl.innerHTML = '<option value="">Todas as Categorias</option>' + 
               (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
       }
       loadEmployeeHistory();
+
     } else if (sec === 'settings') {
       const profileInput = document.getElementById('empProfileName');
       if (profileInput) profileInput.value = currentUser.name;
       setupFuncSettingsForms();
+
     } else if (sec === 'tarefas-recebidas') {
       setupFuncionarioTarefas();
     }
@@ -269,24 +283,27 @@ function setupNewTaskForm() {
       title: document.getElementById('taskTitle').value,
       description: document.getElementById('taskDescription').value,
       status: document.getElementById('taskStatus').value,
+      xpEarned: 0, // Regra: Tarefa comum NÃO gera XP
       createdAt: new Date().toISOString(),
     };
 
     const salvarNoBanco = (atividadeFinal) => {
-      atividadeFinal.id = nextActivityId;
+      // Gera um ID único em milissegundos para não sobrescrever nada!
+      atividadeFinal.id = Date.now(); 
+      
       db.collection('atividades')
         .doc(atividadeFinal.id.toString())
         .set(atividadeFinal)
         .then(() => {
             
-          // 🚀 ESPIÃO: REGISTRA A CRIAÇÃO DA ATIVIDADE DO FUNCIONÁRIO
           if (window.registrarAcao) {
               window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'CRIAR_ATIVIDADE', `Registrou a atividade: ${atividadeFinal.title}`);
           }
 
-          showEmployeeSection('dashboard').then(() =>
-            showToast('Atividade registrada!')
-          );
+          showEmployeeSection('dashboard').then(() => {
+              showToast('Atividade salva com sucesso!', 'success');
+          });
+
         })
         .catch(() => {
           btn.innerHTML = originalText;
@@ -670,3 +687,129 @@ window.setupFuncSettingsForms = function() {
       });
   }
 };
+
+// =======================================================
+// RADAR DE GAMIFICAÇÃO AO VIVO (TEMPO REAL)
+// =======================================================
+window.radarGamificacao = null;
+
+window.atualizarPainelGamificacao = function() {
+    if (!document.getElementById('userLevelDisplay')) return;
+    
+    // Se o radar ainda não estiver ligado, liga-o agora!
+    if (!window.radarGamificacao) {
+        window.radarGamificacao = db.collection('usuarios')
+            .doc(currentUser.id.toString())
+            .onSnapshot(doc => {
+                if (doc.exists) {
+                    const u = doc.data();
+                    
+                    // Atualiza a memória instantaneamente
+                    currentUser.xp = u.xp || 0;
+                    currentUser.goCoins = u.goCoins || 0;
+                    currentUser.level = u.level || 1;
+                    
+                    // Manda pintar a tela com os novos dados
+                    renderizarBarraGamificacao();
+                }
+            });
+    } else {
+        // Se já estiver ligado, apenas pinta a tela
+        renderizarBarraGamificacao();
+    }
+};
+
+function renderizarBarraGamificacao() {
+    let xp = currentUser.xp || 0;
+    let coins = currentUser.goCoins || 0;
+    let level = currentUser.level || 1;
+
+    let titulos = {
+        1: 'Iniciante', 
+        2: 'Focado', 
+        3: 'Produtivo', 
+        4: 'Especialista', 
+        5: 'Mestre das Entregas'
+    };
+    let tituloAtual = titulos[level] || 'Lenda da Empresa 👑';
+
+    // Matemática da barra de progresso
+    let xpAtualNoNivel = xp % 500; 
+    let porcentagem = (xpAtualNoNivel / 500) * 100;
+
+    // Se o painel estiver aberto, atualiza o HTML
+    const levelDisplay = document.getElementById('userLevelDisplay');
+    if (levelDisplay) {
+        levelDisplay.innerText = level;
+        document.getElementById('userTitleDisplay').innerText = tituloAtual;
+        document.getElementById('currentXpDisplay').innerText = xpAtualNoNivel;
+        document.getElementById('xpProgressBar').style.width = porcentagem + '%';
+        
+        // Efeito de piscar nas moedas quando recebe novas
+        const coinDisplay = document.getElementById('goCoinsDisplay');
+        if (coinDisplay.innerText !== coins.toString()) {
+            coinDisplay.innerText = coins;
+            coinDisplay.parentElement.style.transform = 'scale(1.2)';
+            setTimeout(() => { coinDisplay.parentElement.style.transform = 'scale(1)'; }, 300);
+        }
+    }
+}
+
+// =======================================================
+// RADAR DE GAMIFICAÇÃO AO VIVO (TEMPO REAL)
+// =======================================================
+window.radarGamificacao = null;
+
+window.atualizarPainelGamificacao = function() {
+    if (!document.getElementById('userLevelDisplay')) return;
+    
+    // Liga o radar se estiver desligado
+    if (!window.radarGamificacao) {
+        window.radarGamificacao = db.collection('usuarios')
+            .doc(currentUser.id.toString())
+            .onSnapshot(doc => {
+                if (doc.exists) {
+                    const u = doc.data();
+                    
+                    currentUser.xp = u.xp || 0;
+                    currentUser.goCoins = u.goCoins || 0;
+                    currentUser.level = u.level || 1;
+                    
+                    renderizarBarraGamificacao();
+                }
+            });
+    } else {
+        renderizarBarraGamificacao();
+    }
+};
+
+function renderizarBarraGamificacao() {
+    let xp = currentUser.xp || 0;
+    let coins = currentUser.goCoins || 0;
+    let level = currentUser.level || 1;
+
+    let titulos = {
+        1: 'Iniciante', 2: 'Focado', 3: 'Produtivo', 4: 'Especialista', 5: 'Mestre das Entregas'
+    };
+    let tituloAtual = titulos[level] || 'Lenda da Empresa 👑';
+
+    // Matemática da barra
+    let xpAtualNoNivel = xp % 500; 
+    let porcentagem = (xpAtualNoNivel / 500) * 100;
+
+    const levelDisplay = document.getElementById('userLevelDisplay');
+    if (levelDisplay) {
+        levelDisplay.innerText = level;
+        document.getElementById('userTitleDisplay').innerText = tituloAtual;
+        document.getElementById('currentXpDisplay').innerText = xpAtualNoNivel;
+        document.getElementById('xpProgressBar').style.width = porcentagem + '%';
+        
+        // Efeito de piscar nas moedas
+        const coinDisplay = document.getElementById('goCoinsDisplay');
+        if (coinDisplay.innerText !== coins.toString()) {
+            coinDisplay.innerText = coins;
+            coinDisplay.parentElement.style.transform = 'scale(1.2)';
+            setTimeout(() => { coinDisplay.parentElement.style.transform = 'scale(1)'; }, 300);
+        }
+    }
+}

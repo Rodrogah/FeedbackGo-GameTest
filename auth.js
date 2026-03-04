@@ -1,29 +1,27 @@
 // ============ LÓGICA DE AUTENTICAÇÃO E LOGIN ============
 
-document
-  .getElementById('registerForm')
-  .addEventListener('submit', function (e) {
-    e.preventDefault();
-    const em = document.getElementById('adminEmail').value.trim();
-    if (users.find((u) => u.email === em))
+document.getElementById('registerForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const em = document.getElementById('adminEmail').value.trim();
+  if (users.find((u) => u.email === em))
       return showNotice('registerAlert', 'E-mail já em uso.', 'error');
 
-    const btn = document.getElementById('registerBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Criar...';
-    btn.disabled = true;
+  const btn = document.getElementById('registerBtn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Criar...';
+  btn.disabled = true;
 
-    const nComp = {
+  const nComp = {
       id: nextCompanyId,
       name: document.getElementById('companyName').value.trim(),
-      accessCode:
-        'EMP-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+      accessCode: 'EMP-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
       createdAt: new Date().toISOString(),
       teams: ['Equipe Geral'],
       categories: [...defaultCategories],
-    };
+      companyBank: 0,
+  };
 
-    const nUser = {
+  const nUser = {
       id: nextUserId,
       companyId: nComp.id,
       name: document.getElementById('adminName').value.trim(),
@@ -32,60 +30,26 @@ document
       role: 'admin',
       active: true,
       team: 'Administração',
-    };
+  };
 
-    // Monitor de Autenticação (O Porteiro do App)
-    firebase.auth().onAuthStateChanged(async (user) => {
-      const loginUI = document.getElementById('login-container');
-      const appUI = document.getElementById('app-interface');
-  
-      try {
-          if (user) {
-              console.log("Usuário autenticado:", user.email);
-              if (loginUI) loginUI.style.display = 'none';
-              if (appUI) appUI.style.display = 'flex';
-  
-              // Tenta inicializar o app, mas não trava se falhar
-              if (typeof window.initApp === 'function') {
-                  await window.initApp(user);
-              } else {
-                  console.warn("Aviso: initApp não encontrada. Verifique erros no core.js.");
-              }
-          } else {
-              if (appUI) appUI.style.display = 'none';
-              if (loginUI) loginUI.style.display = 'flex';
-          }
-      } catch (error) {
-          console.error("Erro crítico no fluxo de autenticação:", error);
-      } finally {
-          // O BLOCO FINALLY SEMPRE EXECUTA: Isso garante que o Splash suma
-          if (splash) {
-              splash.classList.add('hidden');
-              setTimeout(() => splash.remove(), 400);
-          }
-      }
-  });
-
-    // NOVA ARQUITETURA: Salvar em coleções separadas no Firebase!
-    Promise.all([
+  // NOVA ARQUITETURA: Salva direto nas coleções do Firebase sem travar!
+  Promise.all([
       db.collection('empresas').doc(nComp.id.toString()).set(nComp),
       db.collection('usuarios').doc(nUser.id.toString()).set(nUser),
-    ])
-      .then(() => {
-        document.getElementById('registerForm').reset();
-        showToast('Empresa Registrada com sucesso!');
-        showLoginScreen();
-        document.getElementById('loginEmail').value = em;
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-      })
-      .catch((err) => {
-        console.error(err);
-        showNotice('registerAlert', 'Erro ao criar empresa.', 'error');
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-      });
+  ]).then(() => {
+      document.getElementById('registerForm').reset();
+      showToast('Empresa Registrada com sucesso!');
+      showLoginScreen();
+      document.getElementById('loginEmail').value = em;
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+  }).catch((err) => {
+      console.error(err);
+      showNotice('registerAlert', 'Erro ao criar empresa.', 'error');
+      btn.innerHTML = originalText;
+      btn.disabled = false;
   });
+});
 
   document.getElementById('loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
