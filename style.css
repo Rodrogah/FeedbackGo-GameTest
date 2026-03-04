@@ -1,21 +1,2370 @@
-{
-    "name": "FeedbackGo - Plataforma Empresarial",
-    "short_name": "FeedbackGo",
-    "start_url": "./index.html",
-    "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#10b981",
-    "orientation": "portrait-primary",
-    "icons": [
-      {
-        "src": "icon-192.png",
-        "type": "image/png",
-        "sizes": "192x192"
-      },
-      {
-        "src": "icon-512.png",
-        "type": "image/png",
-        "sizes": "512x512"
-      }
-    ]
+:root {
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #ffffff;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-primary: #10b981;
+  --color-primary-hover: #059669;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-border: #e2e8f0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  overscroll-behavior-y: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Bloqueia a exibição inicial para evitar o flash de login */
+#login-container, 
+#app-interface {
+    display: none;
+}
+
+/* Splash screen sempre por cima de tudo */
+#splash-screen {
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#splash-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* ============ BOTÕES ============ */
+.btn {
+  padding: 12px 20px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn-secondary {
+  background: var(--color-text-secondary);
+}
+
+.btn-secondary:hover {
+  background: #475569;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-info {
+  background: var(--color-info);
+}
+
+.btn-info:hover {
+  background: #2563eb;
+}
+
+.btn-success {
+  background: var(--color-success);
+}
+
+.btn-success:hover {
+  background: #059669;
+}
+
+.btn-icon-only {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  transition: 0.2s;
+}
+
+.btn-icon-only:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.btn-icon-only.edit:hover {
+  color: var(--color-info);
+}
+
+.btn-icon-only.delete:hover {
+  color: var(--color-danger);
+}
+
+/* ============ CARDS E FORMULÁRIOS ============ */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.card h3 {
+  font-size: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-success {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.alert-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* ============ LOGIN E RECUPERAÇÃO ============ */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #10b981 100%);
+  padding: 20px;
+}
+
+.login-card {
+  background: white;
+  padding: 48px 40px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 420px;
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.logo-icon {
+  width: 64px;
+  height: 64px;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-primary);
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.logo h1 {
+  font-size: 24px;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.logo p {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+/* ============ LAYOUT PRINCIPAL (APP) ============ */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  background: #0f172a;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid #1e293b;
+}
+
+.sidebar-logo h2 {
+  color: white;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-logo h2 i {
+  color: var(--color-primary);
+}
+
+.sidebar-logo p {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  transition: 0.2s;
+}
+
+.nav-item i {
+  width: 16px;
+  text-align: center;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-primary);
+}
+
+.sidebar-footer {
+  padding: 16px 12px;
+  border-top: 1px solid #1e293b;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.user-details .name {
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.user-details .role {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.btn-logout:hover {
+  background: var(--color-danger);
+  color: white;
+}
+
+.main-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-header p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* ============ ESTATÍSTICAS E TABELAS ============ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid var(--color-primary);
+}
+
+.stat-card.success {
+  border-left-color: var(--color-success);
+}
+.stat-card.warning {
+  border-left-color: var(--color-warning);
+}
+.stat-card.danger {
+  border-left-color: var(--color-danger);
+}
+
+.stat-card .value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.stat-card .label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  padding: 12px;
+  background: #f8fafc;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid var(--color-border);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tr:hover {
+  background: #f8fafc;
+}
+
+/* ============ BADGES (ETIQUETAS) ============ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-pendente {
+  background: #fef3c7;
+  color: #d97706;
+}
+.badge-andamento {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.badge-concluido {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* ============ FILTROS E ESTADOS VAZIOS ============ */
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  align-items: flex-end;
+}
+
+.filters .form-group {
+  margin-bottom: 0;
+  min-width: 180px;
+  flex: 1;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-secondary);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: var(--color-border);
+}
+
+/* ============ MODAL ============ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--color-bg-secondary); /* Agora ele segue o fundo do tema */
+  width: 100%;
+  max-width: 500px;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+/* Força o Modal a ficar escuro quando o Modo Escuro estiver ativo */
+body.dark-mode .modal-content {
+  background-color: #1e293b !important;
+  border: 1px solid #334155;
+}
+
+/* Garante que os títulos do modal fiquem visíveis */
+body.dark-mode .modal-header h2 {
+  color: #f8fafc !important;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.close-modal:hover {
+  color: var(--color-danger);
+}
+
+/* ======================================================= */
+/* MODO MOBILE PREMIUM (CARTÕES LIMPOS & MENU NATIVO)      */
+/* ======================================================= */
+@media (max-width: 768px) {
+  /* 1. ESTRUTURA BASE E HEADER */
+  html, body { max-width: 100vw; overflow-x: hidden; background-color: var(--color-bg-primary); }
+  .app-container { flex-direction: column; padding-top: 60px; }
+  
+  .sidebar { position: static; width: 100%; height: auto; background: transparent; }
+  .sidebar-logo {
+      position: fixed; top: 0; left: 0; width: 100%; height: 60px;
+      background: #0f172a; z-index: 1001; display: flex; flex-direction: column; justify-content: center;
+      padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-bottom: none;
   }
+  .sidebar-logo h2 { font-size: 18px; margin: 0; }
+  .sidebar-logo p { display: none; }
+
+  /* 2. MENU HAMBÚRGUER E GAVETA LATERAL */
+  .mobile-menu-toggle { display: block; background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; padding: 5px 0; }
+  .sidebar-nav {
+      position: fixed; top: 60px; left: -280px; width: 250px; height: calc(100vh - 60px);
+      background: #0f172a; z-index: 1000; display: flex; flex-direction: column;
+      padding: 15px; transition: 0.3s ease-in-out; border-right: 1px solid #1e293b;
+  }
+  .sidebar-nav.open { left: 0; box-shadow: 100vw 0 0 rgba(0,0,0,0.5); }
+  body.dark-mode .sidebar-nav { background: #1e293b; border-color: #334155; }
+  .nav-item { padding: 10px 14px; font-size: 14px; margin-bottom: 5px; border-radius: 8px; }
+
+  .sidebar-footer {
+      position: fixed; bottom: 0; left: -280px; width: 250px; background: #0f172a; z-index: 1000;
+      padding: 15px; transition: 0.3s ease-in-out; border-top: 1px solid #1e293b;
+  }
+  .sidebar-footer.open { left: 0; }
+  body.dark-mode .sidebar-footer { background: #1e293b; border-color: #334155; }
+
+  /* 3. CONTEÚDO E EMPILHAMENTO */
+  .main-content { margin-left: 0; padding: 15px; width: 100%; }
+  .card { border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+  
+  div[style*="grid-template-columns"], div[style*="display: grid"],
+  #adminConteudoDinamico > div > div, #funcConteudoDinamico > div > div {
+      display: flex !important; flex-direction: column !important; width: 100% !important; gap: 16px !important;
+  }
+  .stat-card { width: 100% !important; border-radius: 12px; }
+  canvas { width: 100% !important; height: auto !important; }
+
+  /* 4. FORMULÁRIOS, BOTÕES E FILTROS */
+  .filters { display: flex !important; flex-direction: column !important; width: 100% !important; gap: 10px !important; }
+  .filters .form-group, .form-grid .form-group { width: 100% !important; min-width: 100% !important; margin-bottom: 5px !important; }
+  input, select, textarea { padding: 12px 14px; border-radius: 10px; font-size: 16px !important; } /* 16px previne zoom no iOS */
+  .btn { padding: 12px; border-radius: 10px; font-size: 15px; }
+  .card .btn { width: 100% !important; margin-top: 8px !important; justify-content: center !important; }
+
+  /* MÁGICA DO BOTÃO CRIAR EQUIPA [+] CENTRALIZADO */
+  #newTeamForm, #addCategoryForm { display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: center !important; }
+  #newTeamForm .form-group, #addCategoryForm .form-group { flex: 1 !important; margin-bottom: 0 !important; }
+  #newTeamForm input, #addCategoryForm input { height: 46px !important; margin: 0 !important; }
+  
+  #newTeamForm button, #addCategoryForm button {
+      width: 46px !important; min-width: 46px !important; height: 46px !important;
+      padding: 0 !important; margin: 0 !important; border-radius: 12px !important;
+      display: flex !important; align-items: center !important; justify-content: center !important;
+      font-size: 0 !important; line-height: 0 !important; /* Trava o alinhamento vertical */
+  }
+  #newTeamForm button::after, #addCategoryForm button::after {
+      content: '\f067'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+      font-size: 20px !important; color: white; display: block !important; margin: auto !important;
+  }
+
+  /* 5. DESIGN BASEADO NO SKETCH (MOBILE) */
+  .table-container { border: none !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; overflow: hidden !important; }
+  table, thead, tbody, th, td, tr { display: block; width: 100%; }
+  thead { display: none; }
+
+  tr {
+      background: var(--color-bg-secondary); margin-bottom: 15px; border-radius: 12px;
+      border: 1px solid var(--color-border); padding: 16px !important; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
+      
+      /* O "MOTOR" QUE REORGANIZA OS ELEMENTOS IGUAL AO SEU DESENHO */
+      display: grid !important;
+      grid-template-columns: 1fr auto; /* Coluna 1 cresce, Coluna 2 ajusta ao status */
+      grid-template-areas:
+          "membro membro"
+          "data data"
+          "categoria status"
+          "titulo titulo"
+          "detalhes detalhes"
+          "acoes acoes";
+      row-gap: 8px; column-gap: 15px; align-items: center;
+  }
+  body.dark-mode tr { background: #1e293b; border-color: #334155; }
+
+  td {
+      border: none !important; padding: 0 !important; display: block !important;
+      font-size: 14px; color: var(--color-text-secondary); line-height: 1.4;
+      white-space: normal !important; word-break: break-word; text-align: left !important;
+  }
+
+  /* MAPEAR CADA PEÇA NO LUGAR DESENHADO (SEM NENHUMA LINHA) */
+  .td-membro { 
+    grid-area: membro; font-size: 15px; margin-bottom: 2px;
+    border-bottom: none !important; padding-bottom: 0 !important; 
+}
+body.dark-mode .td-membro { border-bottom: none !important; }
+
+.td-data { grid-area: data; font-size: 13px; margin-bottom: 4px; }
+
+.td-categoria { grid-area: categoria; }
+
+/* Empurra o Status para a direita */
+.td-status { grid-area: status; justify-self: end; }
+
+.td-titulo { 
+    grid-area: titulo; font-size: 16px; margin-top: 8px;
+    border-bottom: none !important; padding-bottom: 0 !important; 
+}
+body.dark-mode .td-titulo { border-bottom: none !important; }
+
+.td-detalhes { grid-area: detalhes; padding-top: 4px !important; }
+
+/* Área de Ações: Sem linhas extras, apenas os botões alinhados */
+.td-acoes {
+    grid-area: acoes; margin-top: 10px; padding-top: 5px !important; 
+    border-top: none !important;
+    display: flex !important; flex-direction: row !important; justify-content: flex-end !important; gap: 10px !important;
+}
+body.dark-mode .td-acoes { border-top: none !important; }
+
+/* Ajustes Finos de Fonte */
+td strong { color: var(--color-text-primary); font-weight: 700; }
+.badge { display: inline-flex; margin-top: 0; }
+.btn-icon-only { padding: 8px 12px !important; font-size: 14px !important; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 6px; }
+body.dark-mode .btn-icon-only { background: #0f172a; border-color: #334155; }
+
+  /* 6. MÁGICA DAS CONFIGURAÇÕES (DRILL-DOWN APP NATIVO) */
+  .settings-layout-grid { display: block !important; }
+  .settings-nav-list { display: flex; flex-direction: column; gap: 10px; }
+  .settings-nav-list.mobile-hidden { display: none !important; }
+  
+  .settings-content-area { display: none; }
+  .settings-content-area.mobile-active { display: block !important; animation: slideInApp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+  /* Estilo do Botão Voltar Injetado pelo JS */
+  .btn-mobile-back {
+      display: flex !important; align-items: center; gap: 10px; color: var(--color-text-primary);
+      background: transparent; border: none; font-size: 18px; font-weight: 700;
+      padding: 0 0 16px 0; margin-bottom: 24px; border-bottom: 1px solid var(--color-border);
+      width: 100%; cursor: pointer; text-align: left;
+  }
+  body.dark-mode .btn-mobile-back { color: #f8fafc; border-bottom-color: #334155; }
+  
+  @keyframes slideInApp { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* 7. MODAIS GERAIS (Popups) */
+  .modal-overlay { padding: 15px !important; box-sizing: border-box !important; align-items: center; }
+  .modal-content {
+      width: 100% !important; max-width: 100vw !important; height: auto !important; max-height: 90vh !important;
+      overflow-y: auto !important; margin: 0 !important; border-radius: 20px !important; padding: 24px !important;
+  }
+
+@media (max-width: 768px) {
+  /* 1. Preparar o Botão (A Caixa Quadrada) */
+  #newTeamForm button, 
+  #addCategoryForm button {
+      /* Dimensões quadradas precisas (mantenha o tamanho que preferir, ex: 38px ou 46px) */
+      width: 38px !important; 
+      min-width: 38px !important;
+      height: 38px !important;
+      
+      /* Resets de padding/margin que causam desvios */
+      padding: 0 !important;
+      margin: 0 !important;
+      
+      /* 🚀 CRUCIAL PARA A CENTRALIZAÇÃO ABSOLUTA DO [+] 🚀 */
+      position: relative !important; 
+      
+      /* Estilos Visuais */
+      border-radius: 8px !important;
+      border: none !important;
+      background-color: var(--color-success) !important;
+      
+      /* Ocultar o texto original "Criar" */
+      font-size: 0 !important; 
+      color: transparent !important;
+      overflow: hidden !important; /* Garante que o texto oculto não "vaze" */
+  }
+
+  /* 2. Injetar e Centralizar o [+] (O Ícone) */
+  #newTeamForm button::after, 
+  #addCategoryForm button::after {
+      content: '\f067'; /* fa-plus */
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      color: white;
+      
+      /* Tamanho proporcional do mais (ex: 16px) */
+      font-size: 16px !important; 
+      
+      /* 🚀 FÓRMULA MÁGICA DE CENTRALIZAÇÃO ABSOLUTA (Ignora glifos tortos) 🚀 */
+      position: absolute !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      
+      /* Limpa offsets do FontAwesome */
+      line-height: 1 !important;
+      display: block !important;
+      margin: 0 !important;
+  }
+}
+/* ======================================================= */
+/* BLINDAGEM DO COMPUTADOR (PC) - PROTEGE AS CONFIGURAÇÕES */
+/* ======================================================= */
+@media (min-width: 769px) {
+  /* 1. Garante que a área de conteúdo (direita) NUNCA se esconda no PC */
+  .settings-content-area {
+      display: block !important;
+  }
+
+  /* 2. Garante que o menu lateral de opções NUNCA desapareça no PC */
+  .settings-nav-list,
+  .settings-nav-list.mobile-hidden {
+      display: flex !important;
+  }
+
+  /* 3. Esconde o botão "< Voltar" (que só faz sentido no telemóvel) */
+  .btn-mobile-back {
+      display: none !important;
+  }
+}
+}
+
+/* ============ MODO NOTURNO (DARK MODE) - REFINADO E CORRIGIDO ============ */
+
+/* 1. Fundo Geral */
+body.dark-mode {
+  background-color: #0f172a !important;
+  color: #cbd5e1 !important;
+}
+
+/* 2. CAÇADOR DE CAIXAS (Sem Destruir o Layout Novo) */
+body.dark-mode .sidebar,
+body.dark-mode .table-container,
+body.dark-mode .login-box,
+body.dark-mode .card,
+body.dark-mode .settings-card {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 3. ESTATÍSTICAS DO DASHBOARD (Mantendo a linha colorida na esquerda) */
+body.dark-mode .stat-card {
+  background-color: #1e293b !important;
+  border-top: 1px solid #334155 !important;
+  border-right: 1px solid #334155 !important;
+  border-bottom: 1px solid #334155 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 4. LISTAS DO JAVASCRIPT (Apenas Equipes) */
+body.dark-mode #teamsList li {
+  background-color: #0f172a !important;
+  border: 1px solid #334155 !important;
+  color: #f8fafc !important;
+}
+
+/* 5. RESGATE DOS TEXTOS */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode strong,
+body.dark-mode label,
+body.dark-mode .stat-card .value {
+  color: #f8fafc !important;
+}
+body.dark-mode p,
+body.dark-mode .text-muted,
+body.dark-mode .stat-card .label {
+  color: #94a3b8 !important;
+}
+
+/* 6. TABELAS */
+body.dark-mode table th {
+  background-color: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom: 2px solid #334155 !important;
+}
+body.dark-mode table td {
+  background-color: transparent !important;
+  border-bottom: 1px solid #334155 !important;
+  color: #e2e8f0 !important;
+}
+body.dark-mode table tr:hover td {
+  background-color: #334155 !important;
+}
+
+/* ============ REFORÇO DE LEGIBILIDADE (MODO ESCURO) ============ */
+
+body.dark-mode select,
+body.dark-mode select option {
+  background-color: #1e293b !important; /* Fundo azul escuro profundo */
+  color: #ffffff !important; /* Texto branco puro para contraste máximo */
+}
+
+/* Melhora o aspeto visual dos campos de texto */
+body.dark-mode input,
+body.dark-mode textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+}
+
+/* Ajuste para as listas suspensas (Dropdowns) que aparecem brancas em alguns browsers */
+body.dark-mode select:focus {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Correção para o "clipe" e nomes de ficheiros no Modo Escuro */
+body.dark-mode .custom-file-item {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* Garante que o texto dentro dos botões de ação nos modais seja legível */
+body.dark-mode .modal-content .btn-secondary {
+  background-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+/* 7. INPUTS */
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #475569 !important;
+  border-radius: 6px;
+}
+body.dark-mode input:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+  border-color: #10b981 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* 8. ETIQUETAS (NEON) */
+body.dark-mode .badge-concluido {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  color: #4ade80 !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+body.dark-mode .badge-andamento {
+  background-color: rgba(234, 179, 8, 0.15) !important;
+  color: #fde047 !important;
+  border-color: rgba(234, 179, 8, 0.3) !important;
+}
+body.dark-mode .badge-pendente {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+body.dark-mode span[style*='background:#E2E8F0'] {
+  background-color: rgba(56, 189, 248, 0.15) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+body.dark-mode span[style*='background:#EDE9FE'] {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+}
+
+/* ============ LAYOUT DE CONFIGURAÇÕES (RESOLVIDO) ============ */
+
+#adminSettings:not(.hidden),
+#employeeSettings:not(.hidden) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  width: 100%;
+  padding: 30px !important;
+}
+
+/* Quando o JS esconde, esconde mesmo! */
+#adminSettings.hidden,
+#employeeSettings.hidden {
+  display: none !important;
+}
+
+#adminSettings .section-header,
+#employeeSettings .section-header {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 15px;
+}
+body.dark-mode #adminSettings .section-header,
+body.dark-mode #employeeSettings .section-header {
+  border-bottom: 1px solid #334155 !important;
+}
+
+/* FORÇAR A TRANSPARÊNCIA NAS CAIXAS ESTRUTURAIS */
+#adminSettings.app-container,
+#employeeSettings.app-container,
+.settings-layout-grid,
+.settings-nav-list,
+.settings-content-area,
+.centered-content-box,
+body.dark-mode #adminSettings,
+body.dark-mode #employeeSettings,
+body.dark-mode .settings-layout-grid,
+body.dark-mode .settings-nav-list,
+body.dark-mode .settings-content-area,
+body.dark-mode .centered-content-box {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* GRID E MENU */
+.settings-layout-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 40px;
+  align-items: start;
+  width: 100%;
+}
+
+.settings-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.nav-list-item {
+  text-align: left;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-list-item i {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+.nav-list-item:hover {
+  background-color: #f1f5f9;
+  color: #10b981;
+}
+.nav-list-item.active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* OCULTAR ABAS INATIVAS */
+.settings-tab-content:not([style*='display: block']) {
+  display: none !important;
+}
+.settings-tab-content {
+  width: 100%;
+}
+.centered-content-box {
+  max-width: 650px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* MODO ESCURO DO MENU LATERAL */
+body.dark-mode .nav-list-item {
+  color: #94a3b8 !important;
+}
+body.dark-mode .nav-list-item:hover {
+  background-color: #1e293b !important;
+  color: #10b981 !important;
+}
+body.dark-mode .nav-list-item.active {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #10b981 !important;
+}
+
+/* ============ FUSÃO DAS CAIXAS DE CONFIGURAÇÃO (MODO ESCURO) ============ */
+
+/* 1. Remove o fundo, a borda e o preenchimento das caixas internas */
+body.dark-mode #adminSettings .settings-card,
+body.dark-mode #employeeSettings .settings-card {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important; /* Remove o padding extra já que não há mais borda */
+  margin-bottom: 35px !important;
+}
+
+/* 2. Mantém apenas uma linha sutil abaixo dos títulos (Meu Perfil, Dados da Empresa, etc.) */
+body.dark-mode #adminSettings .settings-card h3,
+body.dark-mode #employeeSettings .settings-card h3 {
+  border-bottom: 1px solid #334155 !important;
+  padding-bottom: 12px !important;
+  margin-bottom: 20px !important;
+}
+
+body.dark-mode .theme-toggle-card {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding-left: 0 !important; /* Tira o recuo para alinhar com o título */
+  padding-right: 0 !important;
+}
+
+/* ============ PALETA DE CORES TRANSLÚCIDAS E COM BORDA ============ */
+.cat-badge-dynamic {
+  background-color: hsla(var(--cat-hue), 85%, 45%, 0.15) !important;
+  /* AQUI ESTÁ A MÁGICA: A luminosidade da letra agora é uma variável (--txt-l) */
+  color: hsl(var(--cat-hue), 85%, var(--txt-l, 35%)) !important;
+  border: 1px solid hsla(var(--cat-hue), 85%, 45%, 0.4) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* MODO ESCURO (Efeito Neon Transparente) */
+body.dark-mode .cat-badge-dynamic {
+  background-color: hsla(var(--cat-hue), 80%, 60%, 0.15) !important;
+  color: hsl(var(--cat-hue), 90%, 75%) !important;
+  border: 1px solid hsla(var(--cat-hue), 80%, 60%, 0.4) !important;
+}
+
+/* ============ SISTEMA DE NOTIFICAÇÕES (TOASTS) ============ */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toast {
+  min-width: 280px;
+  background: white;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateX(120%);
+  transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  border-left: 6px solid #10b981;
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+.toast.error {
+  border-left-color: #ef4444;
+}
+.toast i {
+  font-size: 20px;
+}
+.toast-message {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+body.dark-mode .toast {
+  background: #1e293b;
+  color: #f8fafc;
+  border-left-width: 8px;
+}
+body.dark-mode .toast-message {
+  color: #f8fafc;
+}
+
+/* ============ TIMELINE DE LOGS (HISTÓRICO) ============ */
+.logs-section {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 2px dashed #e2e8f0;
+}
+body.dark-mode .logs-section {
+  border-top-color: #334155;
+}
+
+.log-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.log-dot {
+  width: 8px;
+  height: 8px;
+  background: #cbd5e1;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.log-content {
+  color: #64748b;
+}
+body.dark-mode .log-content {
+  color: #94a3b8;
+}
+.log-time {
+  font-weight: bold;
+  color: #1e293b;
+}
+body.dark-mode .log-time {
+  color: #f8fafc;
+}
+/* style.css - Adicionar no final */
+
+/* ========================================= */
+/* VISUAL DO MODAL DE ANEXOS                 */
+/* ========================================= */
+
+/* 1. Modo Claro (Padrão): Fundo 100% Branco e sólido */
+#attachmentModal .modal-content {
+  background-color: #ffffff;
+  border: none;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+/* 2. Modo Escuro: Fundo com a cor do bloco escuro */
+body.dark-mode #attachmentModal .modal-content {
+  background-color: var(--color-card-bg);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+}
+
+/* Remove a linha divisória do cabeçalho do modal */
+#attachmentModal .modal-header {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* ========================================= */
+/* ZONA DE UPLOAD DE ARQUIVOS MODERNA        */
+/* ========================================= */
+.file-drop-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 20px;
+  border: 2px dashed var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-bg-primary);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.file-drop-area:hover {
+  border-color: var(--color-info);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.file-drop-area .fake-btn {
+  background-color: var(--color-info);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.file-drop-area .file-msg {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.file-drop-area input[type='file'] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  cursor: pointer;
+  opacity: 0; /* Esconde o input feio, mas mantém-no clicável */
+}
+
+/* Lista de arquivos selecionados */
+.custom-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.custom-file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+/* ========================================= */
+/* AJUSTE DE CORES (MODO ESCURO E CLARO)     */
+/* ========================================= */
+
+/* 1. Ajuste do campo Título e outros Inputs */
+.form-group input[type='text'],
+.form-group input[type='date'],
+.form-group select {
+  background-color: var(--color-bg-primary, transparent);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+/* 2. Forçar cores corretas no Modo Escuro */
+body.dark-mode .form-group input[type='text'],
+body.dark-mode .form-group input[type='date'],
+body.dark-mode .form-group select,
+body.dark-mode .file-drop-area,
+body.dark-mode .custom-file-item {
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.2
+  ); /* Fundo escuro e levemente transparente */
+  border-color: #334155; /* Borda sutil do modo escuro */
+  color: #f8fafc; /* Texto claro */
+}
+
+/* 3. Efeito de Hover da Zona de Anexos no Modo Escuro */
+body.dark-mode .file-drop-area:hover {
+  border-color: var(--color-info);
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* 4. Cor do texto secundário (ex: "ou arraste e solte aqui") no Modo Escuro */
+body.dark-mode .file-drop-area .file-msg {
+  color: #94a3b8;
+}
+
+/* ========================================= */
+/* BLOQUEIO DO FUNDO BRANCO (AUTOFILL/FOCUS) */
+/* ========================================= */
+
+/* 1. Mantém a cor escura quando você clica dentro do campo para digitar */
+body.dark-mode .form-group input[type='text']:focus,
+body.dark-mode .form-group input[type='date']:focus,
+body.dark-mode .form-group select:focus {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  color: #f8fafc !important;
+  outline: none;
+  border-color: var(--color-info); /* Deixa a borda azul ao clicar */
+}
+
+/* 2. O truque mágico para anular o fundo branco do "Preenchimento Automático" do Chrome */
+body.dark-mode .form-group input:-webkit-autofill,
+body.dark-mode .form-group input:-webkit-autofill:hover,
+body.dark-mode .form-group input:-webkit-autofill:focus,
+body.dark-mode .form-group input:-webkit-autofill:active {
+  -webkit-transition: color 9999s ease-out, background-color 9999s ease-out !important;
+  -webkit-transition-delay: 9999s !important;
+}
+
+/* ========================================== */
+/* BLINDAGEM ABSOLUTA DA TELA DE LOGIN        */
+/* ========================================== */
+
+/* 1. Garante que o card seja sempre branco, mesmo no Modo Escuro */
+body.dark-mode .login-card {
+  background-color: #ffffff !important;
+  border: none !important;
+}
+
+/* 2. Força os textos (Títulos, parágrafos, labels) a serem azuis escuros */
+body.dark-mode .login-card h1,
+body.dark-mode .login-card p,
+body.dark-mode .login-card label,
+body.dark-mode .login-card span {
+  color: #1e293b !important;
+}
+
+/* 3. Força as caixas de texto (inputs) a serem claras com letras escuras */
+body.dark-mode .login-card input {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* 4. Garante que os links (como "Esqueci a senha") não fiquem brancos */
+body.dark-mode .login-card a {
+  color: var(--color-primary) !important;
+}
+
+/* ======================================================= */
+/* DESTRUIÇÃO TOTAL DE LINHAS NOS CARTÕES MOBILE           */
+/* ======================================================= */
+@media (max-width: 768px) {
+  td, 
+  table td, 
+  tr td, 
+  body.dark-mode td,
+  body.dark-mode table td, 
+  body.dark-mode tr td,
+  .td-membro, .td-titulo, .td-acoes {
+      border: none !important;
+      border-bottom: none !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
+  }
+}
+
+/* ======================================================= */
+/* DESTRUIÇÃO DA CAIXA DE 90 GRAUS (TABLE CONTAINER)       */
+/* ======================================================= */
+@media (max-width: 768px) {
+  /* Ataca diretamente a caixa quadrada que envolve as atividades */
+  body .table-container,
+  body.dark-mode .table-container {
+      background: transparent !important;
+      background-color: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+  }
+}
+
+/* ======================================================= */
+/* BANNER FLUTUANTE DE INSTALAÇÃO DO APLICATIVO (PWA)      */
+/* ======================================================= */
+.pwa-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 400px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  z-index: 9999;
+  display: flex; /* Mudará via JS */
+  flex-direction: column;
+  gap: 15px;
+  animation: slideUpPwa 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+body.dark-mode .pwa-banner { background: #1e293b; border-color: #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+.pwa-banner-content { display: flex; align-items: center; gap: 15px; }
+.pwa-icon-wrapper { font-size: 24px; color: var(--color-success); background: rgba(16, 185, 129, 0.1); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; flex-shrink: 0; }
+.pwa-text h4 { margin: 0 0 4px 0; font-size: 16px; color: var(--color-text-primary); }
+.pwa-text p { margin: 0; font-size: 13px; color: var(--color-text-secondary); line-height: 1.3; }
+
+.pwa-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+#pwa-install-btn { padding: 10px 20px; font-size: 14px; border-radius: 10px; font-weight: 600; }
+.btn-pwa-close { background: transparent; border: none; color: var(--color-text-secondary); font-size: 20px; padding: 8px 12px; cursor: pointer; border-radius: 8px; }
+
+@keyframes slideUpPwa {
+  from { bottom: -120px; opacity: 0; transform: translateX(-50%) scale(0.9); }
+  to { bottom: 20px; opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* ======================================================= */
+/* CHAVINHA DE TEMA - VERSÃO FINAL SEM SALTOS              */
+/* ======================================================= */
+.theme-switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  margin: 15px 0;
+  transition: background 0.3s ease;
+}
+
+/* Força a visibilidade total no Modo Escuro */
+body.dark-mode .theme-switch-container { 
+  background: #1e293b !important; 
+  border-color: #334155 !important; 
+}
+
+.theme-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Fixa a largura do texto para o botão não pular */
+  min-width: 140px; 
+}
+
+/* Cor do texto: Forçamos branco no Dark Mode para não sumir */
+#themeSwitchText {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b; /* Cor no modo claro */
+}
+
+body.dark-mode #themeSwitchText {
+  color: #f8fafc !important; /* Branco acinzentado no modo escuro */
+}
+
+#themeSwitchIcon {
+  font-size: 18px;
+  width: 20px;
+  text-align: center;
+}
+
+/* A estrutura da chavinha (Switch) */
+.theme-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0; /* Impede que a chavinha esmague */
+}
+
+.theme-switch input { opacity: 0; width: 0; height: 0; }
+
+.theme-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 34px;
+}
+
+.theme-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+.theme-switch input:checked + .theme-slider {
+  background-color: #10b981 !important; /* Verde Sucesso */
+}
+
+.theme-switch input:checked + .theme-slider:before {
+  transform: translateX(22px);
+}
+
+/* ======================================================= */
+/* PULL TO REFRESH - VERSÃO BOLINHA FLUTUANTE              */
+/* ======================================================= */
+.ptr-element {
+  position: fixed;
+  top: 50px; /* Ajuste para ficar abaixo do seu header */
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  transform: translateY(-120px); /* Garante que começa fora do ecrã */
+  transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1);
+  pointer-events: none; /* Deixa clicar no que está atrás dela */
+}
+
+.ptr-bubble {
+  width: 42px;
+  height: 42px;
+  background: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  color: #10b981;
+}
+
+body.dark-mode .ptr-bubble { background: #334155; }
+
+/* Esconde as interfaces até o Firebase dar o veredito */
+#login-container, 
+#app-interface {
+    display: none;
+}
+
+/* ============ ANIMAÇÕES DE NAVEGAÇÃO ============ */
+.fade-entrar {
+  animation: transicaoTela 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes transicaoTela {
+  0% {
+      opacity: 0;
+      /* Usar margin em vez de transform impede que o modal fique preso! */
+      margin-top: 15px; 
+  }
+  100% {
+      opacity: 1;
+      margin-top: 0;
+  }
+}
+
+/* 🚀 ESCONDE O MENU HAMBÚRGUER NO PC */
+.mobile-menu-toggle {
+  display: none !important;
+}
+
+/* 📱 MOSTRA APENAS NO CELULAR */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+  }
+}
+
+/* Efeitos Premium para Tarefas */
+.task-premium-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+.selection-grid-container label:hover {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.selection-grid-container input[type="checkbox"]:checked + span {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+/* Loader discreto */
+.loader-placeholder {
+  text-align: center;
+  padding: 50px;
+  opacity: 0.6;
+  font-weight: 600;
+}
+
+/* Navegação por Abas Internas */
+.internal-tabs-nav {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 35px;
+  border-bottom: 2px solid var(--color-border);
+  padding-left: 10px;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 5px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: 0.3s;
+}
+
+.tab-btn.active {
+  color: var(--color-info);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--color-info);
+  border-radius: 10px;
+}
+
+/* Visibilidade das Seções */
+.delegar-section { display: none; }
+.delegar-section.active { display: block; animation: fadeIn 0.4s ease; }
+
+/* Inputs Minimalistas */
+.form-control-minimal {
+  border: none !important;
+  border-bottom: 2px solid var(--color-border) !important;
+  border-radius: 0 !important;
+  padding: 15px 5px !important;
+  font-size: 16px !important;
+  background: transparent !important;
+}
+
+.form-control-minimal:focus {
+  border-bottom-color: var(--color-info) !important;
+  box-shadow: none !important;
+}
+
+.form-grid-spaced {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px; /* Espaço generoso entre colunas */
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .form-grid-spaced { grid-template-columns: 1fr; gap: 30px; }
+}
+
+/* Container de Seleção com Bolinha Verde */
+.green-dot-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.green-dot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.green-dot-item:hover {
+  border-color: var(--color-primary);
+}
+
+/* A Bolinha Verde */
+.dot {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  position: relative;
+  transition: 0.3s;
+}
+
+/* Quando o input escondido for marcado, a bolinha ativa */
+input[name="funcDelegado"]:checked + .green-dot-item .dot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+input[name="funcDelegado"]:checked + .green-dot-item .dot::after {
+  content: '\f00c'; /* ícone de check */
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 10px;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Esconde o checkbox original */
+.input-hidden {
+  display: none;
+}
+
+/* 🚀 Cards que respeitam o tema (Escuro/Claro) */
+.task-premium-card {
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+/* 📱 Modal Amplo e Centralizado */
+#modalResponderTarefa .modal-content {
+  max-width: 850px !important; /* Mais largo para não ficar esmagado */
+  width: 95% !important;
+  background: var(--color-bg-secondary) !important;
+  border-radius: 20px !important;
+  padding: 40px !important;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
+}
+
+/* Destaque para os Anexos do Admin */
+.admin-attachment-box {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 2px dashed var(--color-info) !important;
+  padding: 20px !important;
+  border-radius: 12px !important;
+  margin: 20px 0 !important;
+}
+
+.internal-tabs-nav .tab-btn {
+  background: none; border: none; padding: 10px 20px; cursor: pointer;
+  color: var(--color-text-secondary); font-weight: 600;
+}
+.internal-tabs-nav .tab-btn.active {
+  color: var(--color-primary); border-bottom: 3px solid var(--color-primary);
+}
+
+.green-dot-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px; background: var(--color-bg-primary); 
+  border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 8px;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #cbd5e1; }
+input[name="funcDelegado"]:checked + .green-dot-item .dot {
+  background: var(--color-success); border-color: var(--color-success);
+}
+
+/* 📱 Ajuste do Modal para Janela Larga */
+#modalResponderTarefa .modal-content {
+  max-width: 850px !important; width: 95%;
+  background: var(--color-bg-secondary) !important;
+}
+
+/* Teams Style Modal */
+.teams-modal {
+  max-width: 1000px !important;
+  width: 90% !important;
+  height: 85vh !important;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-icon-main { font-size: 24px; color: var(--color-primary); }
+.modal-subtitle { font-size: 13px; opacity: 0.7; }
+
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 250px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.teams-main-column { padding: 30px; border-right: 1px solid var(--color-border); }
+.teams-sidebar { padding: 30px; background: rgba(0,0,0,0.02); }
+
+.modal-section { margin-bottom: 30px; }
+.modal-section h3 { font-size: 14px; margin-bottom: 15px; border: none; }
+
+.description-box { line-height: 1.6; font-size: 15px; }
+
+/* Grid de Anexos (Estilo Teams) */
+.attachment-grid-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.download-card-teams {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: 0.2s;
+}
+
+.download-card-teams:hover { border-color: var(--color-primary); background: rgba(16, 185, 129, 0.05); }
+
+/* Área de Upload */
+.upload-zone-teams {
+  border: 2px dashed var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.upload-zone-teams input { position: absolute; opacity: 0; width: 100%; height: 100%; top:0; left:0; cursor: pointer; }
+
+/* --- GESTOR DE EQUIPES & ABAS --- */
+.internal-tabs-nav { display: flex; gap: 25px; margin-bottom: 30px; border-bottom: 2px solid var(--color-border); }
+.tab-btn { background: none; border: none; padding: 12px 5px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; position: relative; }
+.tab-btn.active { color: var(--color-info); }
+.tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--color-info); }
+.delegar-section { display: none; }
+.delegar-section.active { display: block; animation: fadeIn 0.3s ease; }
+
+/* --- SELEÇÃO BOLINHA VERDE --- */
+.green-dot-item { display: flex; align-items: center; justify-content: space-between; padding: 15px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
+.dot { width: 18px; height: 18px; border: 2px solid #cbd5e1; border-radius: 50%; transition: 0.3s; }
+input[name="funcDelegado"]:checked + .green-dot-item { border-color: var(--color-primary); background: rgba(16, 185, 129, 0.05); }
+input[name="funcDelegado"]:checked + .green-dot-item .dot { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+
+/* --- MODAL ESTILO TEAMS --- */
+.teams-modal { max-width: 900px !important; width: 95% !important; height: 80vh !important; padding: 0 !important; overflow: hidden !important; display: flex; flex-direction: column; }
+.teams-header { padding: 20px 30px; background: var(--color-bg-primary); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+.teams-body { display: grid; grid-template-columns: 1fr 280px; height: 100%; overflow-y: auto; }
+.teams-main { padding: 30px; border-right: 1px solid var(--color-border); }
+.teams-side { padding: 30px; background: rgba(0,0,0,0.02); }
+
+/* ======================================================= */
+/* MODAL TEAMS STYLE (TAREFAS RECEBIDAS)                   */
+/* ======================================================= */
+
+/* 1. Anula as margens padrão do modal antigo */
+.modal-content.teams-modal {
+  max-width: 900px !important;
+  width: 95% !important;
+  height: 85vh !important;
+  padding: 0 !important; /* 🚀 REMOVE A BORDA BRANCA GIGANTE */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: 16px !important;
+}
+
+/* 2. Cabeçalho */
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.teams-header-info { display: flex; align-items: center; gap: 15px; }
+
+.teams-header-info .icon-circle {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+
+.teams-header-info h2 { margin: 0 0 4px 0 !important; font-size: 20px !important; border: none !important; padding: 0 !important; }
+.teams-header-info .subtitle { margin: 0; font-size: 13px; color: var(--color-text-secondary); }
+
+.teams-modal-header .close-modal { align-self: center; margin: 0; padding: 0; display: block; }
+
+/* 3. Corpo (Sistema de Grid 2 Colunas) */
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-bg-secondary);
+}
+
+.teams-main-column { padding: 30px; }
+.teams-sidebar { padding: 30px; background: var(--color-bg-primary); border-left: 1px solid var(--color-border); }
+
+/* 4. Secções e Instruções */
+.teams-section { margin-bottom: 35px; }
+.teams-section h3 {
+  font-size: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px;
+}
+
+.instruction-box { background: var(--color-bg-primary); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border); }
+.instruction-box p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--color-text-primary); }
+
+/* 5. Downloads */
+.teams-attachment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.download-card-teams { background: var(--color-bg-secondary); border: 1px solid var(--color-border); padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--color-text-primary); transition: 0.2s; }
+.download-card-teams:hover { border-color: var(--color-info); background: rgba(59, 130, 246, 0.05); }
+
+/* 6. Sidebar (Direita) */
+.sidebar-block { margin-bottom: 25px; }
+.sidebar-block label { font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; }
+.sidebar-block p { font-weight: 600; font-size: 14px; margin: 0; color: var(--color-text-primary); }
+
+/* 7. Responsivo Mobile */
+@media (max-width: 768px) {
+  .teams-modal-body { grid-template-columns: 1fr; }
+  .teams-sidebar { border-left: none; border-top: 1px solid var(--color-border); }
+}
+
+/* ======================================================= */
+/* CORREÇÃO DE ESCALA E LAYOUT (MODAL TEAMS)               */
+/* ======================================================= */
+
+#modalResponderTarefa.modal-overlay {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(5px) !important;
+}
+
+/* 🚀 TRAVA A JANELA NO CENTRO E IMPEDE DE VAZAR A TELA */
+.modal-content.teams-modal {
+  padding: 0 !important; /* Anula o branco extra */
+  max-width: 950px !important;
+  width: 95% !important;
+  height: 85vh !important; /* Fixa a altura máxima */
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 16px !important;
+  overflow: hidden !important; /* Corta qualquer coisa que tente sair da caixa */
+  background: var(--color-bg-secondary) !important;
+}
+
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0; /* Impede o cabeçalho de encolher */
+}
+
+.teams-header-info { display: flex; align-items: center; gap: 15px; }
+.teams-header-info .icon-circle {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.teams-header-info h2 { margin: 0 0 4px 0 !important; font-size: 20px !important; border: none !important; padding: 0 !important; }
+
+/* 🚀 O SEGREDO DO SCROLL: Só o corpo da janela rola */
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  overflow-y: auto; /* Scroll apenas interno */
+  flex-grow: 1; /* Ocupa o resto do espaço */
+  height: 100%;
+}
+
+.teams-main-column {
+  padding: 30px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 25px; /* Espaço igual entre as caixas */
+}
+
+.teams-sidebar { 
+  padding: 30px; 
+  background: var(--color-bg-primary); 
+  border-left: 1px solid var(--color-border); 
+}
+
+.teams-section {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 0 !important;
+}
+body.dark-mode .teams-section { background: rgba(0, 0, 0, 0.15); }
+
+.teams-section h3 {
+  font-size: 15px !important; margin: 0 0 15px 0 !important;
+  border-bottom: 1px dashed var(--color-border) !important;
+  padding-bottom: 12px !important; color: var(--color-text-primary) !important;
+}
+
+.instruction-box {
+  background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+  padding: 16px; border-radius: 8px;
+}
+.instruction-box p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--color-text-primary); }
+
+@media (max-width: 768px) {
+  .teams-modal-body { grid-template-columns: 1fr; }
+  .teams-sidebar { border-left: none; border-top: 1px solid var(--color-border); }
+}
+
+/* FORÇA A ATUALIZAÇÃO DAS CORES NO MODO ESCURO */
+body.dark-mode {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-border: #334155;
+}
+
+/* ======================================================= */
+/* CORREÇÃO DO TOQUE E SCROLL (MOBILE PWA TOUCH FIX)       */
+/* ======================================================= */
+
+/* 1. Restaura a fluidez do Scroll no iOS e Android e evita travamentos */
+html, body {
+  overscroll-behavior-y: auto !important; 
+  -webkit-overflow-scrolling: touch !important; 
+}
+
+/* 2. Resposta imediata! Remove o delay de 300ms nos cliques */
+button, a, input, select, textarea, .nav-item, .btn-icon-only, .file-drop-area, .green-dot-item, .tab-btn {
+  touch-action: manipulation !important; 
+  -webkit-tap-highlight-color: transparent !important; /* Remove o "piscar cinza" no Android */
+}
+
+/* 3. Garante que elementos escondidos (como o splash screen) não roubem os cliques da tela */
+.hidden {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+#splash-screen.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  display: none !important;
+}
+
+/* ======================================================= */
+/* 🚀 BLINDAGEM DE TOQUE E SCROLL (CORREÇÃO MOBILE FINAL)  */
+/* ======================================================= */
+
+/* 1. Liberta o ecrã tátil do bloqueio do iOS */
+html, body {
+  overflow-x: visible !important; /* Remove o bloqueio maldito do iPhone */
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: auto !important; 
+}
+
+/* Movemos o corte da tela para o container interno, salvando os toques */
+.app-container {
+  overflow-x: hidden !important;
+  width: 100vw;
+  max-width: 100%;
+}
+
+/* 2. Anula a obrigatoriedade de "Duplo Clique" no telemóvel (Bug do Hover) */
+@media (hover: none) {
+  .btn:hover, .nav-item:hover, .btn-icon-only:hover, .download-card-teams:hover, .green-dot-item:hover, .file-drop-area:hover {
+      transform: none !important;
+      box-shadow: none !important;
+      background-color: inherit; /* Ignora a mudança de cor no 1º toque */
+  }
+}
+
+/* 3. Resposta Imediata aos cliques e prevenção de seleção de texto acidental */
+button, a, input[type="button"], select, .nav-item, .btn-icon-only, .file-drop-area, .green-dot-item, .tab-btn, .close-modal {
+  touch-action: manipulation !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important; /* Remove o piscar cinzento no Android */
+  user-select: none !important; /* Evita a lupa de texto ao tocar rápido */
+}
+
+/* Permite selecionar texto apenas onde deve ser permitido */
+input[type="text"], input[type="email"], input[type="password"], textarea, p, h1, h2, h3, span {
+  user-select: auto;
+}
+
+/* 4. Corrige o espaço gigante duplo nas Configurações do telemóvel */
+.main-content .app-container {
+  padding-top: 0 !important;
+  min-height: auto !important;
+}
+
+/* ======================================================= */
+/* CORREÇÃO DO MENU DROPDOWN (GRUPOS) NO MODO ESCURO       */
+/* ======================================================= */
+
+/* Estilo para o título do grupo (Ex: IOT) */
+body.dark-mode select optgroup {
+  background-color: #0f172a !important; /* Fundo escuro profundo para destacar o cabeçalho */
+  color: #10b981 !important; /* Cor verde principal para dar destaque ao título */
+  font-weight: bold !important;
+}
+
+/* Estilo para as opções selecionáveis dentro do grupo */
+body.dark-mode select option {
+  background-color: #1e293b !important; /* Fundo um pouco mais claro para as opções */
+  color: #f8fafc !important; /* Texto branco puro */
+  padding: 5px !important;
+}
+
+/* ======================================================= */
+/* CAIXAS DE SELEÇÃO (CHECKBOXES) NO MODO ESCURO           */
+/* ======================================================= */
+body.dark-mode input[type="checkbox"] {
+  color-scheme: dark; /* Força o navegador a renderizar a caixa escura */
+  accent-color: #10b981; /* Deixa o visto (check) verde ao clicar */
+  cursor: pointer;
+}
+
+/* ======================================================= */
+/* CALENDÁRIOS PREMIUM (FLATPICKR) - LISTA E POSIÇÃO       */
+/* ======================================================= */
+
+/* 1. Esconde resquícios do calendário antigo do navegador */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button {
+    display: none;
+    opacity: 0;
+}
+
+/* 2. Base do Calendário */
+.flatpickr-calendar {
+    font-family: inherit !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.15) !important;
+    border: none !important;
+    padding: 0 !important; 
+}
+
+/* 🚀 NOVO: Joga o calendário um pouco mais para cima ao abrir */
+.flatpickr-calendar.open {
+    margin-top: -12px !important; 
+}
+
+/* 3. BLINDAGEM DO CABEÇALHO (Mês e Ano em formato interativo) */
+.flatpickr-months {
+    padding-top: 15px !important;
+    padding-bottom: 5px !important;
+}
+
+/* 🚀 NOVO: O Mês (Transformado visualmente numa lista/dropdown) */
+.flatpickr-calendar .flatpickr-monthDropdown-months {
+    background: transparent !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    padding: 0 20px 0 5px !important; /* Espaço para a setinha */
+    margin-right: 10px !important;
+    cursor: pointer !important;
+    outline: none !important;
+    color: var(--color-text-primary) !important;
+    
+    /* Cria uma setinha "v" limpa e profissional */
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right center !important;
+    background-size: 14px !important;
+}
+
+/* 🚀 NOVO: O Ano (Com setinhas visíveis para subir/descer) */
+.flatpickr-calendar input.cur-year {
+    background: transparent !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    outline: none !important;
+    cursor: pointer !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Revela as setinhas de subir/descer do Ano ao lado do número */
+.flatpickr-calendar .numInputWrapper span {
+    display: block !important;
+    opacity: 0.4 !important;
+    border: none !important;
+}
+.flatpickr-calendar .numInputWrapper span:hover {
+    background: rgba(16, 185, 129, 0.2) !important;
+    opacity: 1 !important;
+}
+
+/* Efeito Hover (Fica Verde) no mês e setas de passar o mês */
+.flatpickr-calendar .flatpickr-monthDropdown-months:hover,
+.flatpickr-calendar input.cur-year:hover,
+.flatpickr-months .flatpickr-prev-month:hover svg, 
+.flatpickr-months .flatpickr-next-month:hover svg {
+    color: var(--color-primary) !important;
+    fill: var(--color-primary) !important;
+}
+
+/* 4. DESIGN DOS DIAS */
+.flatpickr-day.selected, 
+.flatpickr-day.startRange, 
+.flatpickr-day.endRange {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: white !important;
+}
+.flatpickr-day.today {
+    border-color: var(--color-primary) !important;
+    font-weight: 800;
+}
+body.dark-mode .flatpickr-day.today {
+    border-color: var(--color-primary) !important;
+}
+.flatpickr-day {
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+/* 5. MODO ESCURO (ADAPTAÇÃO) */
+body.dark-mode .flatpickr-calendar {
+    background: #1e293b !important; 
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5) !important;
+    border: 1px solid #334155 !important;
+}
+
+/* Textos Claros */
+body.dark-mode .flatpickr-day,
+body.dark-mode .flatpickr-month, 
+body.dark-mode .flatpickr-current-month,
+body.dark-mode .flatpickr-weekday,
+body.dark-mode .flatpickr-calendar .flatpickr-monthDropdown-months,
+body.dark-mode .flatpickr-calendar input.cur-year {
+    color: #f8fafc !important; 
+}
+
+/* Setinha do Mês pintada de branco no modo escuro */
+body.dark-mode .flatpickr-calendar .flatpickr-monthDropdown-months {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+/* Setinhas normais de passar o mês (Brancas no escuro) */
+body.dark-mode .flatpickr-months .flatpickr-prev-month svg, 
+body.dark-mode .flatpickr-months .flatpickr-next-month svg {
+    fill: #f8fafc !important;
+}
+
+/* Hover nos dias */
+body.dark-mode .flatpickr-day:hover:not(.selected) {
+    background: rgba(16, 185, 129, 0.15) !important; 
+    color: var(--color-primary) !important; 
+    border-color: transparent !important;
+}
+
+/* Dias fora do mês */
+body.dark-mode .flatpickr-day.flatpickr-disabled,
+body.dark-mode .flatpickr-day.prevMonthDay, 
+body.dark-mode .flatpickr-day.nextMonthDay {
+    color: #475569 !important;
+}
+
+/* O fundo da listinha do mês no Modo Escuro */
+body.dark-mode .flatpickr-monthDropdown-months option {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+}

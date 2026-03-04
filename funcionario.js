@@ -1,1035 +1,672 @@
-// ============ 1. INTEGRAÇÃO FIREBASE & EMAIL ============
-const firebaseConfig = {
-  apiKey: 'AIzaSyCzNiOwGdmaOULQ3_UMNw0TX6w3J03vXVE',
-  authDomain: 'feedbackgooficial.firebaseapp.com',
-  projectId: 'feedbackgooficial',
-  storageBucket: 'feedbackgooficial.firebasestorage.app',
-  messagingSenderId: '531915627918',
-  appId: '1:531915627918:web:5210c0851b4ae9b088d8df',
-  measurementId: 'G-6N68F5759T',
-};
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
+// ============ MOTOR DE NAVEGAÇÃO DO FUNCIONÁRIO ============
+async function showEmployeeSection(sec) {
+  const palco = document.getElementById('funcConteudoDinamico'); 
+  if (!palco) return console.error('Erro fatal: funcConteudoDinamico não existe!');
 
-const EMAILJS_SERVICE_ID = 'service_gmail';
-const EMAILJS_TEMPLATE_GENERIC = 'template_welcome';
-const EMAILJS_TEMPLATE_REPORT = 'template_report';
+  document.querySelectorAll('#employeePanel .nav-item').forEach((i) => i.classList.remove('active'));
+  const activeNav = document.querySelector(`#employeePanel .nav-item[onclick*="${sec}"]`);
+  if (activeNav) activeNav.classList.add('active');
 
-// ============ 2. VARIÁVEIS GLOBAIS ============
-let companies = [],
-  users = [],
-  activities = [];
-let currentUser = null,
-  nextCompanyId = 1,
-  nextUserId = 1,
-  nextActivityId = 1;
-let isFirstLoad = true;
-const defaultCategories = [
-  'Geral',
-  'Reunião',
-  'Desenvolvimento',
-  'Suporte',
-  'Vendas',
-  'Formação',
-];
+  palco.style.transition = 'opacity 0.2s ease';
+  palco.style.opacity = '0';
+  await new Promise(resolve => setTimeout(resolve, 200));
 
-/// ============ 3. MÁGICA DO TEMPO REAL (NOVA ARQUITETURA) ============
-let loadState = { emp: false, usr: false, act: false };
+  palco.innerHTML = '<div style="text-align:center; padding:50px; opacity: 0.4;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i></div>';
+  palco.style.opacity = '1';
 
-function checkFirstLoad() {
-  // Só liberta o login quando as 3 coleções terminarem de carregar
-  if (isFirstLoad && loadState.emp && loadState.usr && loadState.act) {
-    isFirstLoad = false;
-    processAutoLogin();
-  } else if (!isFirstLoad) {
-    refreshLiveData();
+  try {
+    const rotas = {
+      dashboard: 'func-dashboard.html',
+      'new-task': 'func-nova-atividade.html',
+      history: 'func-historico.html',
+      settings: 'func-configuracoes.html',
+      'tarefas-recebidas': 'func-tarefas-recebidas.html'
+    };
+    
+    const resposta = await fetch(`./telas/${rotas[sec]}`);
+    if (!resposta.ok) throw new Error('Erro de fetch: Ficheiro não encontrado.');
+    
+    palco.innerHTML = await resposta.text();
+    palco.classList.remove('fade-entrar');
+    void palco.offsetWidth; 
+    palco.classList.add('fade-entrar');
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+
+    const c = companies.find((x) => x.id === currentUser.companyId);
+
+    if (sec === 'dashboard') {
+      const greet = document.getElementById('employeeGreeting');
+      if (greet) greet.textContent = `Olá, ${currentUser.name.split(' ')[0]}!`;
+      updateEmployeeStats();
+      loadEmployeeRecentTasks();
+      updateCurrentDate('currentDate');
+
+      const avisoCard = document.getElementById('employeeAnnouncementCard');
+      const avisoTexto = document.getElementById('employeeAnnouncementText');
+      if (avisoCard && avisoTexto && c) {
+        if (c.announcement && c.announcement.trim() !== '') {
+          avisoTexto.textContent = c.announcement;
+          avisoCard.style.display = 'block';
+        } else {
+          avisoCard.style.display = 'none';
+        }
+      }
+      renderFuncCharts();
+    } else if (sec === 'new-task') {
+      if (typeof setTodayDate === 'function') setTodayDate('taskDate');
+      const catEl = document.getElementById('taskCategory');
+      if (catEl && c) {
+          catEl.innerHTML = typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '';
+      }
+      setupNewTaskForm();
+    } else if (sec === 'history') {
+      // 🚀 AQUI: Carrega as categorias (agrupadas) no filtro do Histórico!
+      const catEl = document.getElementById('empFilterCategory');
+      if (catEl && c) {
+          catEl.innerHTML = '<option value="">Todas as Categorias</option>' + 
+              (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
+      }
+      loadEmployeeHistory();
+    } else if (sec === 'settings') {
+      const profileInput = document.getElementById('empProfileName');
+      if (profileInput) profileInput.value = currentUser.name;
+      setupFuncSettingsForms();
+    } else if (sec === 'tarefas-recebidas') {
+      setupFuncionarioTarefas();
+    }
+  } catch (err) {
+    palco.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
   }
 }
 
-// 📡 Radar das Empresas
-db.collection('empresas').onSnapshot(
-  (snap) => {
-    companies = snap.docs.map((doc) => doc.data());
-    nextCompanyId =
-      companies.length > 0 ? Math.max(...companies.map((c) => c.id)) + 1 : 1;
-    loadState.emp = true;
-    checkFirstLoad();
-  },
-  (err) => console.error('Erro Empresas:', err)
-);
+function initEmployeePanel() {
+  const c = companies.find((x) => x.id === currentUser.companyId);
+  if (!c) return;
+  document.getElementById('empCompanySidebar').textContent = c.name;
+  document.getElementById('sidebarEmployeeName').textContent =
+    currentUser.name.split(' ')[0];
+  document.getElementById('employeeAvatar').textContent = currentUser.name
+    .charAt(0)
+    .toUpperCase();
+  document.getElementById('employeeTeamName').textContent =
+    currentUser.team || 'Membro';
+  showEmployeeSection('dashboard');
 
-// 📡 Radar dos Usuários
-db.collection('usuarios').onSnapshot(
-  (snap) => {
-    users = snap.docs.map((doc) => doc.data());
-    nextUserId = users.length > 0 ? Math.max(...users.map((u) => u.id)) + 1 : 1;
-    loadState.usr = true;
-    checkFirstLoad();
-  },
-  (err) => console.error('Erro Usuários:', err)
-);
+  setTimeout(runAutoCleanup, 5000);
+}
 
-// 📡 Radar das Atividades
-db.collection('atividades').onSnapshot(
-  (snap) => {
-    activities = snap.docs.map((doc) => doc.data());
-    nextActivityId =
-      activities.length > 0 ? Math.max(...activities.map((a) => a.id)) + 1 : 1;
-    loadState.act = true;
-    checkFirstLoad();
-  },
-  (err) => console.error('Erro Atividades:', err)
-);
+function updateEmployeeStats() {
+  const minhasAtividades = activities.filter(
+    (a) => a.userId === currentUser.id
+  );
+  const elHoje = document.getElementById('todayTasksCount');
+  if (elHoje)
+    elHoje.textContent = minhasAtividades.filter(
+      (a) => a.date === getLocalToday()
+    ).length;
+  const elMes = document.getElementById('monthTasks');
+  if (elMes)
+    elMes.textContent = minhasAtividades.filter(
+      (a) => new Date(a.date).getMonth() === new Date().getMonth()
+    ).length;
+  const elTotal = document.getElementById('totalTasks');
+  if (elTotal) elTotal.textContent = minhasAtividades.length;
+}
 
-function processAutoLogin() {
-  const savedUserId = localStorage.getItem('feedbackgo_logged_user');
-  if (savedUserId) {
-    const autoUser = users.find(
-      (u) => u.id === parseInt(savedUserId) && u.active
-    );
-    if (autoUser) {
-      currentUser = autoUser;
+function loadEmployeeRecentTasks() {
+  const el = document.getElementById('employeeRecentTasks');
+  if (!el) return;
+  const lista = activities
+    .filter((a) => a.userId === currentUser.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+  el.innerHTML = generateActivityTableHTML(lista, false);
+}
 
-      // Acende a bolinha verde de Online
-      db.collection('usuarios').doc(currentUser.id.toString()).update({ isOnline: true }).catch(()=>{});
+// ============ SISTEMA DE PAGINAÇÃO (FUNCIONÁRIO) ============
+let currentEmpPage = 1;
+let currentEmpFilteredActs = [];
 
-      // 🚀 REGISTO DIRETO: Não depende de outras funções carregarem primeiro
-      if (!sessionStorage.getItem('sessao_registrada')) {
-          const dataLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString();
-          
-          db.collection('acessos').add({
-              userId: currentUser.id,
-              companyId: currentUser.companyId,
-              userName: currentUser.name,
-              acao: 'LOGIN',
-              detalhes: 'Retornou ao sistema (Acesso automático)',
-              timestamp: dataLocal
-          }).then(() => {
-              sessionStorage.setItem('sessao_registrada', 'sim');
-          }).catch(err => console.error("Erro no auto-login:", err));
-      }
+function loadEmployeeHistory() {
+  currentEmpPage = 1;
+  // Limpa os filtros de data ao abrir a aba
+  const elStart = document.getElementById('empFilterStart');
+  const elEnd = document.getElementById('empFilterEnd');
+  if (elStart) elStart.value = '';
+  if (elEnd) elEnd.value = '';
+  
+  applyEmployeeFilters(1);
+}
 
-      // 🛡️ PROTEÇÃO: Só avança se a função visual existir
-      if (typeof showPanel === 'function') {
-        showPanel(autoUser.role);
-      } else {
-        setTimeout(() => { if(typeof showPanel === 'function') showPanel(autoUser.role); }, 500);
-      }
-      return;
-    } else {
-      localStorage.removeItem('feedbackgo_logged_user');
+window.applyEmployeeFilters = function(page = 1) {
+  currentEmpPage = page;
+  
+  // Captura o valor de todos os campos de pesquisa
+  const s = document.getElementById('empFilterStart') ? document.getElementById('empFilterStart').value : '';
+  const e = document.getElementById('empFilterEnd') ? document.getElementById('empFilterEnd').value : '';
+  const cat = document.getElementById('empFilterCategory') ? document.getElementById('empFilterCategory').value : ''; // Categoria
+  const search = document.getElementById('empFilterSearch') ? document.getElementById('empFilterSearch').value.toLowerCase().trim() : ''; // Barra de texto
+  
+  let f = activities.filter((a) => a.userId === currentUser.id);
+
+  // Aplica os filtros um a um
+  if (s) f = f.filter((a) => a.date >= s);
+  if (e) f = f.filter((a) => a.date <= e);
+  if (cat) f = f.filter((a) => a.category === cat);
+  if (search) {
+      f = f.filter((a) => 
+          (a.title && a.title.toLowerCase().includes(search)) || 
+          (a.description && a.description.toLowerCase().includes(search))
+      );
+  }
+
+  // Ordenação do mais novo para o mais antigo
+  currentEmpFilteredActs = f.sort((a, b) => {
+    const diffData = new Date(b.date) - new Date(a.date);
+    if (diffData === 0 && a.createdAt && b.createdAt) {
+        return new Date(b.createdAt) - new Date(a.createdAt);
     }
+    return diffData;
+  });
+
+  // Desenha a tabela com os resultados
+  renderEmployeeHistoryPage();
+};
+
+window.renderEmployeeHistoryPage = function() {
+  const el = document.getElementById('employeeHistoryTable');
+  if (!el) return;
+
+  const itemsPerPage = 20; // 20 Itens por página
+  const totalPages = Math.ceil(currentEmpFilteredActs.length / itemsPerPage) || 1;
+  
+  if (currentEmpPage > totalPages) currentEmpPage = totalPages;
+  if (currentEmpPage < 1) currentEmpPage = 1;
+
+  // Fatiar a lista para pegar apenas os 20 da página atual
+  const start = (currentEmpPage - 1) * itemsPerPage;
+  const actsPage = currentEmpFilteredActs.slice(start, start + itemsPerPage);
+
+  // Gerar a tabela com a "fatia"
+  let html = generateActivityTableHTML(actsPage, false);
+
+  // Adicionar controlos de paginação no final da tabela
+  if (totalPages > 1) {
+      html += `
+      <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 25px; padding: 10px;">
+          <button class="btn btn-secondary btn-small" onclick="applyEmployeeFilters(${currentEmpPage - 1})" ${currentEmpPage === 1 ? 'disabled' : ''}>
+              <i class="fa-solid fa-chevron-left"></i> Anterior
+          </button>
+          <span style="font-size: 14px; font-weight: bold; color: var(--color-text-secondary);">
+              Página ${currentEmpPage} de ${totalPages}
+          </span>
+          <button class="btn btn-secondary btn-small" onclick="applyEmployeeFilters(${currentEmpPage + 1})" ${currentEmpPage === totalPages ? 'disabled' : ''}>
+              Próxima <i class="fa-solid fa-chevron-right"></i>
+          </button>
+      </div>`;
   }
   
-  if (typeof showLoginScreen === 'function') {
-    showLoginScreen();
-  }
-}
+  el.innerHTML = html;
+};
 
-function refreshLiveData() {
-  if (!currentUser) return;
+function setupNewTaskForm() {
+  const form = document.getElementById('newTaskForm');
+  if (!form) return;
+  const novoForm = form.cloneNode(true);
+  form.parentNode.replaceChild(novoForm, form);
 
-  if (currentUser.role === 'admin') {
-    if (typeof updateAdminStats === 'function') updateAdminStats();
+  // === LÓGICA VISUAL DOS 3 ARQUIVOS ===
+  const fileInput = novoForm.querySelector('#taskAttachment');
+  const fileListDisplay = novoForm.querySelector('#fileListDisplay');
+  let arquivosSelecionados = [];
 
-    const palco = document.getElementById('adminConteudoDinamico');
-    if (palco) {
-      if (
-        palco.querySelector('#adminRecentActivities') &&
-        typeof loadAdminRecentActivities === 'function'
-      )
-        loadAdminRecentActivities();
-      if (
-        palco.querySelector('#adminActivitiesTable') &&
-        typeof applyAdminFilters === 'function'
-      )
-        applyAdminFilters();
-      if (
-        palco.querySelector('#usersTable') &&
-        typeof loadUsersTable === 'function'
-      )
-        loadUsersTable();
-      if (
-        palco.querySelector('#adminStatusChart') &&
-        typeof renderAdminCharts === 'function'
-      )
-        renderAdminCharts();
-    }
-  } else {
-    if (typeof updateEmployeeStats === 'function') updateEmployeeStats();
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      const files = Array.from(this.files);
 
-    const palcoFunc = document.getElementById('funcConteudoDinamico');
-    if (palcoFunc) {
-      if (
-        palcoFunc.querySelector('#employeeRecentTasks') &&
-        typeof loadEmployeeRecentTasks === 'function'
-      )
-        loadEmployeeRecentTasks();
-      if (
-        palcoFunc.querySelector('#employeeHistoryTable') &&
-        typeof loadEmployeeHistory === 'function'
-      )
-        loadEmployeeHistory();
-      if (
-        palcoFunc.querySelector('#funcStatusChart') &&
-        typeof renderFuncCharts === 'function'
-      )
-        renderFuncCharts();
-    }
-  }
-}
-// NOTA: A função saveData() antiga foi apagada porque agora cada ficheiro guarda na sua própria coleção!
-
-// ============ 4. EMAILS ============
-function sendWelcomeEmail(userName, userEmail, userPass) {
-  const comp = companies.find((c) => c.id === currentUser.companyId);
-  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_GENERIC, {
-    to_name: userName,
-    to_email: userEmail,
-    subject: 'Bem-vindo à ' + (comp ? comp.name : 'FeedbackGo'),
-    message_title: 'Sua conta foi criada',
-    message_body: 'Seus dados de acesso:',
-    label_destaque: 'Senha',
-    password: userPass,
-    extra_info: 'Altere a senha após o login.',
-    company_name: comp ? comp.name : 'FeedbackGo',
-  });
-}
-function sendFilteredReportEmail(event) {
-  const filteredActs = getFilteredReportData();
-  if (filteredActs.length === 0) return alert('Não há dados para enviar.');
-
-  // Garante que o texto comece pelo registro mais antigo
-  filteredActs.sort((a, b) => a.date.localeCompare(b.date));
-
-  let txt = `Relatório Gerado:\nTotal: ${filteredActs.length}\n\n`;
-  filteredActs.forEach((act) => {
-    const u = users.find((x) => x.id === act.userId);
-    // Montagem do texto seguindo a ordem cronológica
-    txt += `[${formatDate(act.date)}] ${u ? u.name : 'Removido'} - ${
-      act.category
-    }: ${act.title} (${act.status})\n`;
-  });
-
-  const btn = event.currentTarget;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Enviar...';
-  btn.disabled = true;
-
-  emailjs
-    .send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_REPORT, {
-      to_name: currentUser.name,
-      to_email: currentUser.email,
-      relatorio_texto: txt,
-    })
-    .then(() => {
-      btn.innerHTML = '<i class="fa-solid fa-check"></i> Enviado!';
-      setTimeout(() => {
-        btn.innerHTML = orig;
-        btn.disabled = false;
-      }, 3000);
-    })
-    .catch((err) => {
-      alert('Erro ao enviar.');
-      btn.innerHTML = orig;
-      btn.disabled = false;
-    });
-}
-
-// ============ 5. ATIVIDADES SHARED (COMPARTILHADAS) ============
-function generateActivityTableHTML(acts, isAdmin = false) {
-  if (!acts.length)
-    return `<div class="empty-state"><i class="fa-solid fa-box-open empty-state-icon"></i><p>Nenhum registro encontrado.</p></div>`;
-  return `<div class="table-container"><table><thead><tr>${
-    isAdmin ? '<th>Membro</th>' : ''
-  }<th>Data</th><th>Categoria</th><th>Atividade</th><th>Detalhes</th><th>Status</th><th>Ações</th></tr></thead><tbody>
-          ${acts
-            .map((a) => {
-              const u = users.find((x) => x.id === a.userId);
-              const canEdit = isAdmin || a.userId === currentUser.id;
-              return `<tr>${
-                isAdmin
-                  ? `<td class="td-membro"><strong>${
-                      u ? u.name : 'Removido'
-                    }</strong> <span class="td-equipe" style="color: var(--color-text-secondary); font-weight: normal;"> - ${
-                      u ? u.team : ''
-                    }</span></td>`
-                  : ''
-              }
-              <td class="td-data">${formatDate(a.date)}</td>
-              <td class="td-categoria"><span class="badge cat-badge-dynamic" style="${getCategoryStyleString(
-                a.category || 'Geral'
-              )}">${typeof formatCategoryName === 'function' ? formatCategoryName(a.category) : (a.category || 'Geral')}</span></td>
-              <td class="td-titulo"><strong>${
-                a.title
-              }</strong></td><td class="td-detalhes">${
-                a.description ? a.description : '-'
-              }</td>
-              <td class="td-status">${getStatusBadge(a.status)}</td><td class="td-acoes">${
-                canEdit
-                  ? `
-                  ${
-                    (a.attachments && a.attachments.length > 0) ||
-                    a.attachmentUrl
-                      ? `<button type="button" onclick="openAttachmentModal(${a.id})" class="btn-icon-only" title="Ver Anexos" style="margin-right: 5px; color: var(--color-info);"><i class="fa-solid fa-paperclip"></i></button>`
-                      : ''
-                  }
-
-              <button type="button" onclick="openHistoryModal(${
-                a.id
-              })" class="btn-icon-only" title="Ver Histórico" style="margin-right: 5px;"><i class="fa-solid fa-clock-rotate-left"></i></button>
-              <button type="button" onclick="openEditModal(${
-                a.id
-              })" class="btn-icon-only edit" title="Editar"><i class="fa-solid fa-pen"></i></button> 
-              <button type="button" onclick="deleteActivity(${
-                a.id
-              })" class="btn-icon-only delete" title="Apagar"><i class="fa-solid fa-trash"></i></button>`
-                  : '<i class="fa-solid fa-lock" style="color:#CBD5E1;"></i>'
-              }
-          </td></tr>`;
-            })
-            .join('')}</tbody></table></div>`;
-}
-
-document
-  .getElementById('editTaskForm')
-  .addEventListener('submit', function (e) {
-    e.preventDefault();
-    const id = parseInt(document.getElementById('editTaskId').value);
-    const newStatus = document.getElementById('editTaskStatus').value;
-    const btn = document.getElementById('btnSaveEdit');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Guardar...';
-
-    const a = activities.find((x) => x.id === id);
-    if (a) {
-      const oldStatus = a.status;
-      if (oldStatus !== newStatus) {
-        if (!a.logs) a.logs = [];
-        a.logs.push({
-          date: new Date().toISOString(),
-          userName: currentUser.name,
-          from: oldStatus,
-          to: newStatus,
-        });
+      // Bloqueia se tentar enviar mais de 3
+      if (files.length > 3) {
+        showToast('Você só pode anexar no máximo 3 arquivos!', 'error');
+        this.value = '';
+        fileListDisplay.innerHTML = '';
+        arquivosSelecionados = [];
+        return;
       }
-      a.date = document.getElementById('editTaskDate').value;
-      a.category = document.getElementById('editTaskCategory').value;
-      a.title = document.getElementById('editTaskTitle').value;
-      a.description = document.getElementById('editTaskDescription').value;
-      a.status = newStatus;
 
+      arquivosSelecionados = [];
+      fileListDisplay.innerHTML = '';
+
+      for (let i = 0; i < files.length; i++) {
+        // Bloqueia se ALGUM arquivo for maior que 1MB
+        if (files[i].size > 1 * 1024 * 1024) {
+          showToast(`O arquivo ${files[i].name} é maior que 1MB!`, 'error');
+          this.value = '';
+          fileListDisplay.innerHTML = '';
+          arquivosSelecionados = [];
+          return;
+        }
+        arquivosSelecionados.push(files[i]);
+        // Desenha a listinha na tela
+        fileListDisplay.innerHTML += `<div class="custom-file-item"><i class="fa-solid fa-file-lines" style="color: var(--color-info);"></i> ${files[i].name}</div>`;
+      }
+    });
+  }
+
+  // === LÓGICA DE SALVAR NO BANCO ===
+  novoForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const btn = novoForm.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML =
+      '<i class="fa-solid fa-spinner fa-spin"></i> A Processar...';
+    btn.disabled = true;
+
+    const novaAtividade = {
+      companyId: currentUser.companyId,
+      userId: currentUser.id,
+      date: document.getElementById('taskDate').value,
+      category: document.getElementById('taskCategory').value,
+      title: document.getElementById('taskTitle').value,
+      description: document.getElementById('taskDescription').value,
+      status: document.getElementById('taskStatus').value,
+      createdAt: new Date().toISOString(),
+    };
+
+    const salvarNoBanco = (atividadeFinal) => {
+      atividadeFinal.id = nextActivityId;
       db.collection('atividades')
-        .doc(id.toString())
-        .update(a)
+        .doc(atividadeFinal.id.toString())
+        .set(atividadeFinal)
         .then(() => {
-          
-          // 🚀 ESPIÃO: REGISTRA A EDIÇÃO
+            
+          // 🚀 ESPIÃO: REGISTRA A CRIAÇÃO DA ATIVIDADE DO FUNCIONÁRIO
           if (window.registrarAcao) {
-              window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'EDITAR_ATIVIDADE', `Editou a atividade: ${a.title}`);
+              window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'CRIAR_ATIVIDADE', `Registrou a atividade: ${atividadeFinal.title}`);
           }
 
-          showToast('Atividade atualizada!');
-          closeEditModal();
+          showEmployeeSection('dashboard').then(() =>
+            showToast('Atividade registrada!')
+          );
         })
         .catch(() => {
-          showToast('Erro ao salvar', 'error');
+          btn.innerHTML = originalText;
           btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Alterações';
+          showToast('Erro ao salvar!', 'error');
         });
+    };
+
+    // Se tem arquivos, processa TODOS eles juntos
+    if (arquivosSelecionados.length > 0) {
+      btn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> A Processar Anexos...';
+
+      // Cria uma fila de tarefas para converter todos os arquivos para texto
+      const promessasDeArquivos = arquivosSelecionados.map((file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = function (evento) {
+            resolve({ name: file.name, url: evento.target.result });
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      // Quando TODOS terminarem de converter, salva no banco!
+      Promise.all(promessasDeArquivos).then((anexosProntos) => {
+        novaAtividade.attachments = anexosProntos; // Salva a lista inteira!
+        salvarNoBanco(novaAtividade);
+      });
+    } else {
+      salvarNoBanco(novaAtividade);
     }
   });
+}
 
-  window.deleteActivity = function(id) {
-    showConfirm(
-      'Tem certeza que deseja apagar esta atividade permanentemente? Se for uma tarefa delegada, ela também será apagada do sistema.',
-      () => {
-        db.collection('atividades').doc(id.toString()).get().then(docSnap => {
-          if (!docSnap.exists) return;
-          const atividade = docSnap.data();
-          
-          db.collection('atividades').doc(id.toString()).delete().then(() => {
-              
-            // 🚀 ESPIÃO: REGISTRA A EXCLUSÃO
-            if (window.registrarAcao) {
-                window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'EXCLUIR_ATIVIDADE', `Apagou o registro: ${atividade.title || 'Sem título'}`);
-            }
-  
-            if (atividade.tarefaVinculadaId) {
-              db.collection('tarefas').doc(atividade.tarefaVinculadaId).delete().catch(err => console.error(err));
-            }
-  
-            showToast('Atividade apagada com sucesso!');
-            if (typeof refreshLiveData === 'function') refreshLiveData();
-            
-            // Atualiza a tela automaticamente
-            if (document.getElementById('employeeHistoryTable') && typeof loadEmployeeHistory === 'function') loadEmployeeHistory();
-            if (document.getElementById('adminActivitiesTable') && typeof loadAllActivities === 'function') loadAllActivities();
-          });
-        });
+let funcStatusChartInstance = null;
+let funcCategoryChartInstance = null;
+
+window.renderFuncCharts = function () {
+  const isDark = document.body.classList.contains('dark-mode');
+  const textColor = isDark ? '#f8fafc' : '#1e293b';
+  const gridColor = isDark ? '#334155' : '#e2e8f0';
+  const myActs = activities.filter((a) => a.userId === currentUser.id);
+
+  const ctxStatus = document.getElementById('funcStatusChart');
+  if (ctxStatus) {
+    let conc = 0,
+      and = 0,
+      pend = 0;
+    myActs.forEach((a) => {
+      if (a.status === 'concluido') conc++;
+      else if (a.status === 'andamento') and++;
+      else if (a.status === 'pendente') pend++;
+    });
+    const bgStatus = isDark
+      ? [
+          'rgba(74, 222, 128, 0.85)',
+          'rgba(253, 224, 71, 0.85)',
+          'rgba(248, 113, 113, 0.85)',
+        ]
+      : ['#22c55e', '#eab308', '#ef4444'];
+    const borderStatus = isDark
+      ? ['#22c55e', '#eab308', '#ef4444']
+      : ['#ffffff', '#ffffff', '#ffffff'];
+    if (funcStatusChartInstance) funcStatusChartInstance.destroy();
+    funcStatusChartInstance = new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: ['Concluído', 'Em Andamento', 'Pendente'],
+        datasets: [
+          {
+            data: [conc, and, pend],
+            backgroundColor: bgStatus,
+            borderWidth: 2,
+            borderColor: borderStatus,
+          },
+        ],
       },
-      'Apagar Atividade?'
-    );
-  };
-
-// ============ 6. MODO ESCURO ============
-function toggleDarkMode() {
-  const body = document.body;
-  const isDark = body.classList.toggle('dark-mode');
-  
-  // Padronização da chave para salvar a preferência
-  localStorage.setItem('feedbackgo_theme', isDark ? 'dark' : 'light');
-  
-  updateThemeIcons(isDark);
-  
-  // Se você tiver a chavinha nas configurações, sincronize ela aqui
-  if (typeof syncThemeSwitchUI === 'function') syncThemeSwitchUI();
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem('feedbackgo_theme') === 'dark') {
-    document.body.classList.add('dark-mode');
-    updateThemeIcons(true);
-  }
-});
-
-// ============ 7. CÉREBRO DE CORES (UI) ============
-const assignedCategoryHues = {};
-let colorCounter = 0;
-function getCategoryHue(categoryName) {
-  if (!categoryName) return 200;
-  if (assignedCategoryHues[categoryName] !== undefined)
-    return assignedCategoryHues[categoryName];
-  let newHue = Math.floor(colorCounter * 137.5) % 360;
-  assignedCategoryHues[categoryName] = newHue;
-  colorCounter++;
-  return newHue;
-}
-function getCategoryStyleString(categoryName) {
-  let hue = getCategoryHue(categoryName);
-  let textLightness = hue >= 40 && hue <= 200 ? '15%' : '35%';
-  return `--cat-hue: ${hue}; --txt-l: ${textLightness};`;
-}
-
-// ============ 8. SISTEMA DE CONFIRMAÇÃO & TOASTS ============
-let currentConfirmCallback = null;
-function showConfirm(message, callback, title = 'Atenção') {
-  document.getElementById('confirmTitle').innerText = title;
-  document.getElementById('confirmMessage').innerText = message;
-  currentConfirmCallback = callback;
-  document.getElementById('confirmModal').classList.remove('hidden');
-}
-function closeConfirmModal() {
-  document.getElementById('confirmModal').classList.add('hidden');
-  currentConfirmCallback = null;
-}
-function executeConfirmAction() {
-  if (currentConfirmCallback) {
-    currentConfirmCallback();
-  }
-  closeConfirmModal();
-}
-
-function showToast(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-  const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation';
-  toast.innerHTML = `<i class="fa-solid ${icon}" style="color: ${
-    type === 'success' ? '#10b981' : '#ef4444'
-  }"></i><div class="toast-message">${message}</div>`;
-  container.appendChild(toast);
-  setTimeout(() => toast.classList.add('show'), 100);
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 400);
-  }, 3500);
-}
-
-// ============ 9. MODAIS DE EDIÇÃO E HISTÓRICO ============
-function openEditModal(id) {
-  const a = activities.find((x) => x.id === id);
-  if (!a) return;
-  if (currentUser.role === 'funcionario' && a.userId !== currentUser.id) {
-    showToast('Acesso negado!', 'error');
-    return;
-  }
-  const c = companies.find((x) => x.id === currentUser.companyId);
-  document.getElementById('editTaskCategory').innerHTML = typeof buildCategorySelectOptions === 'function' 
-      ? buildCategorySelectOptions(c.categories || defaultCategories) 
-      : (c.categories || defaultCategories).map((cat) => `<option value="${cat}">${cat}</option>`).join('');
-
-  document.getElementById('editTaskId').value = a.id;
-  document.getElementById('editTaskDate').value = a.date;
-  document.getElementById('editTaskCategory').value = a.category || 'Geral';
-  document.getElementById('editTaskTitle').value = a.title;
-  document.getElementById('editTaskDescription').value = a.description || '';
-  document.getElementById('editTaskStatus').value = a.status;
-  document.getElementById('editModal').classList.remove('hidden');
-}
-function closeEditModal() {
-  document.getElementById('editModal').classList.add('hidden');
-  const btn = document.getElementById('btnSaveEdit');
-  if (btn) {
-    btn.disabled = false;
-    btn.innerHTML =
-      '<i class="fa-solid fa-floppy-disk"></i> Guardar Alterações';
-  }
-}
-// Variáveis de controle para o histórico
-// Variável global para controlar a escolha do usuário
-let currentHistoryOrder = 'asc'; 
-
-function openHistoryModal(id) {
-  const a = activities.find((x) => x.id === id);
-  if (!a) return;
-
-  const content = document.getElementById('historyContent');
-  if (content) {
-    // Aqui criamos o seletor que faltava
-    content.innerHTML = `
-      <div class="history-header-filter" style="margin-bottom: 20px; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
-        <span style="font-size: 12px; opacity: 0.8;">Ordem:</span>
-        <select id="changeHistoryOrder" onchange="reOrderHistory(${id})" style="padding: 6px 10px; border-radius: 8px; font-size: 12px; background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); cursor: pointer;">
-          <option value="asc" ${currentHistoryOrder === 'asc' ? 'selected' : ''}>Mais antigo para novo</option>
-          <option value="desc" ${currentHistoryOrder === 'desc' ? 'selected' : ''}>Mais novo para antigo</option>
-        </select>
-      </div>
-      <div id="logItemsList"></div>
-    `;
-    // Chama a função para desenhar os itens na tela
-    reOrderHistory(id);
-  }
-  document.getElementById('historyModal').classList.remove('hidden');
-}
-
-// 🔄 Função que redesenha os logs quando você muda o filtro
-window.reOrderHistory = function(activityId) {
-  const a = activities.find((x) => x.id === activityId);
-  const order = document.getElementById('changeHistoryOrder').value;
-  currentHistoryOrder = order; // Salva a preferência para a próxima vez
-  
-  const listContainer = document.getElementById('logItemsList');
-  let logs = a.logs ? [...a.logs] : [];
-
-  // Ordena os logs baseados na data/hora da alteração
-  logs.sort((x, y) => {
-    return order === 'asc' ? new Date(x.date) - new Date(y.date) : new Date(y.date) - new Date(x.date);
-  });
-
-  listContainer.innerHTML = logs.length > 0
-    ? logs.map(log => `
-        <div class="log-item"><div class="log-dot"></div><div class="log-content">
-            <span class="log-time" style="display:block; font-size:11px; opacity:0.7;">${new Date(log.date).toLocaleString('pt-BR')}</span>
-            <strong>${log.userName}</strong> alterou para <span style="text-transform:uppercase; font-weight:bold; font-size:10px;">${log.to}</span>
-        </div></div>`).join('')
-    : '<p style="text-align:center; padding:20px; opacity:0.6;">Nenhuma alteração registrada.</p>';
-};
-
-function closeHistoryModal() {
-  document.getElementById('historyModal').classList.add('hidden');
-}
-
-function toggleHistorySort() {
-  currentHistoryOrder = document.getElementById('sortHistoryOrder').value;
-  renderHistoryLogs();
-}
-
-function renderHistoryLogs() {
-  const container = document.getElementById('logsContainer');
-  if (!container) return;
-
-  // Ordena os logs
-  const sortedLogs = [...currentHistoryLogs].sort((a, b) => {
-    return currentHistoryOrder === 'asc' 
-      ? new Date(a.date) - new Date(b.date) 
-      : new Date(b.date) - new Date(a.date);
-  });
-
-  container.innerHTML = sortedLogs.length > 0
-    ? sortedLogs.map(log => `
-        <div class="log-item">
-          <div class="log-dot"></div>
-          <div class="log-content">
-            <span class="log-time" style="display:block; font-size:11px; opacity:0.7;">
-              ${new Date(log.date).toLocaleString('pt-BR')}
-            </span>
-            <strong>${log.userName}</strong> alterou para 
-            <span style="text-transform:uppercase; font-weight:bold; font-size:10px;">${log.to}</span>
-          </div>
-        </div>`).join('')
-    : '<p style="text-align:center; padding:20px; opacity:0.6;">Nenhuma alteração registrada.</p>';
-}
-
-// ============ UTILS DIVERSOS ============
-function getLocalToday() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    '0'
-  )}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function formatDate(ds) {
-  if (!ds) return '';
-  const p = ds.split('-');
-  return `${p[2]}/${p[1]}/${p[0]}`;
-}
-function getStatusBadge(s) {
-  const b = {
-    concluido: '<span class="badge badge-concluido">Concluído</span>',
-    andamento: '<span class="badge badge-andamento">Em Andamento</span>',
-    pendente: '<span class="badge badge-pendente">Pendente</span>',
-  };
-  return b[s] || s;
-}
-function updateCurrentDate(id) {
-  const el = document.getElementById(id);
-  if (el) {
-    let str = new Date().toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: textColor } },
+        },
+      },
     });
-    el.textContent = str.charAt(0).toUpperCase() + str.slice(1);
   }
-}
-function setTodayDate(id) {
-  const el = document.getElementById(id);
-  if (el) el.value = getLocalToday();
-}
-function showNotice(id, msg, type) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.innerHTML = msg;
-  el.className = `alert alert-${type}`;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 5000);
-}
-window.initApp = function () {
-  console.log('Core iniciado!');
-};
 
-// ============ MODAL DE ANEXOS (SUPORTE A MÚLTIPLOS) ============
-window.openAttachmentModal = function (activityId) {
-  const atividade = activities.find((x) => x.id === activityId);
-  if (!atividade) return;
-
-  const content = document.getElementById('attachmentContent');
-  let html = `<i class="fa-solid fa-folder-open" style="font-size: 48px; color: var(--color-info); margin-bottom: 15px;"></i>`;
-
-  // Se for a versão nova (com até 3 anexos)
-  if (atividade.attachments && atividade.attachments.length > 0) {
-    html += `<p style="margin-bottom: 20px; font-size: 14px;">Esta atividade contém <strong>${atividade.attachments.length} anexo(s)</strong>:</p>
-               <div style="display: flex; flex-direction: column; gap: 10px;">`;
-
-    atividade.attachments.forEach((anexo) => {
-      const isBase64 = anexo.url.startsWith('data:');
-      const actionAttr = isBase64
-        ? `download="${anexo.name}"`
-        : 'target="_blank"';
-      html += `<a href="${anexo.url}" ${actionAttr} class="btn btn-info" style="display: flex; justify-content: space-between; align-items: center; text-align: left;">
-                      <span style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${anexo.name}</span> 
-                      <i class="fa-solid fa-download"></i>
-                   </a>`;
+  const ctxCategory = document.getElementById('funcCategoryChart');
+  if (ctxCategory) {
+    const catCounts = {};
+    myActs.forEach((a) => {
+      const c = a.category || 'Geral';
+      catCounts[c] = (catCounts[c] || 0) + 1;
     });
-    html += `</div>`;
-  }
-  // Se for uma atividade antiga (com apenas 1 anexo)
-  else if (atividade.attachmentUrl) {
-    const isBase64 = atividade.attachmentUrl.startsWith('data:');
-    const actionAttr = isBase64
-      ? `download="${atividade.attachmentName || 'Anexo'}"`
-      : 'target="_blank"';
-    html += `<p style="margin-bottom: 20px; font-size: 14px;">Arquivo: <strong style="color: var(--color-text-primary);">${
-      atividade.attachmentName || 'Anexo'
-    }</strong></p>
-               <a href="${
-                 atividade.attachmentUrl
-               }" ${actionAttr} class="btn btn-info"><i class="fa-solid fa-download"></i> Baixar Anexo</a>`;
-  }
-
-  content.innerHTML = html;
-  document.getElementById('attachmentModal').classList.remove('hidden');
-};
-
-// ============ ROBÔ DE LIMPEZA GLOBAL (VERSÃO BLINDADA) ============
-window.runAutoCleanup = function () {
-  if (!currentUser) return;
-  console.log('[Robô] Iniciando varredura de manutenção...');
-
-  const umAnoAtras = new Date();
-  umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
-  const dataLimite = umAnoAtras.toISOString().split('T')[0];
-
-  // Regra: 1 ano exato ou mais (<=)
-  const atividadesParaLimpar = activities.filter(
-    (a) =>
-      a.companyId === currentUser.companyId &&
-      a.date <= dataLimite &&
-      (a.attachmentUrl || (a.attachments && a.attachments.length > 0))
-  );
-
-  if (atividadesParaLimpar.length > 0) {
-    atividadesParaLimpar.forEach((a) => {
-      const limpeza = {
-        attachmentUrl: firebase.firestore.FieldValue.delete(),
-        attachmentName: firebase.firestore.FieldValue.delete(),
-        attachments: firebase.firestore.FieldValue.delete(),
-        systemNote:
-          'Limpeza automática realizada em ' + new Date().toLocaleDateString(),
-      };
-
-      // CORREÇÃO FINAL: O ID tem de ser sempre STRING para o Firebase não dar erro
-      const docId = String(a.id);
-      db.collection('atividades')
-        .doc(docId)
-        .update(limpeza)
-        .then(() => console.log('[Robô] Sucesso na ID: ' + docId))
-        .catch((err) => console.error('[Robô] Erro na ID ' + docId + ':', err));
-
-      // Limpa na memória local para o visual atualizar sem F5
-      a.attachmentUrl = null;
-      a.attachments = null;
-      a.attachmentName = null;
+    const labels = Object.keys(catCounts);
+    const data = Object.values(catCounts);
+    const bgColors = labels.map((cat) => {
+      const hue =
+        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
+      return isDark
+        ? `hsla(${hue}, 80%, 60%, 0.75)`
+        : `hsla(${hue}, 85%, 45%, 0.75)`;
     });
-
-    // Redesenha a tabela (Admin ou Funcionário)
-    if (typeof refreshLiveData === 'function') refreshLiveData();
-  } else {
-    console.log('[Robô] Nenhuma atividade antiga encontrada para limpar.');
-  }
-};
-
-// ============ MODAL DE ANEXOS (SUPORTE A MÚLTIPLOS) ============
-window.openAttachmentModal = function (activityId) {
-  const atividade = activities.find((x) => x.id === activityId);
-  if (!atividade) return;
-
-  const content = document.getElementById('attachmentContent');
-  let html = `<i class="fa-solid fa-folder-open" style="font-size: 48px; color: var(--color-info); margin-bottom: 15px;"></i>`;
-
-  // Se for a versão nova (com até 3 anexos)
-  if (atividade.attachments && atividade.attachments.length > 0) {
-    html += `<p style="margin-bottom: 20px; font-size: 14px;">Esta atividade contém <strong>${atividade.attachments.length} anexo(s)</strong>:</p>
-               <div style="display: flex; flex-direction: column; gap: 10px;">`;
-
-    atividade.attachments.forEach((anexo) => {
-      const isBase64 = anexo.url.startsWith('data:');
-      const actionAttr = isBase64
-        ? `download="${anexo.name}"`
-        : 'target="_blank"';
-      html += `<a href="${anexo.url}" ${actionAttr} class="btn btn-info" style="display: flex; justify-content: space-between; align-items: center; text-align: left;">
-                      <span style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${anexo.name}</span> 
-                      <i class="fa-solid fa-download"></i>
-                   </a>`;
+    const borderColors = labels.map((cat) => {
+      const hue =
+        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
+      return isDark ? `hsl(${hue}, 80%, 60%)` : `hsl(${hue}, 85%, 45%)`;
     });
-    html += `</div>`;
+    if (funcCategoryChartInstance) funcCategoryChartInstance.destroy();
+    funcCategoryChartInstance = new Chart(ctxCategory, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Nº de Atividades',
+            data: data,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 1,
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: textColor, stepSize: 1 },
+            grid: { color: gridColor },
+          },
+          x: { ticks: { color: textColor }, grid: { display: false } },
+        },
+      },
+    });
   }
-  // Se for uma atividade antiga (com apenas 1 anexo)
-  else if (atividade.attachmentUrl) {
-    const isBase64 = atividade.attachmentUrl.startsWith('data:');
-    const actionAttr = isBase64
-      ? `download="${atividade.attachmentName || 'Anexo'}"`
-      : 'target="_blank"';
-    html += `<p style="margin-bottom: 20px; font-size: 14px;">Arquivo: <strong style="color: var(--color-text-primary);">${
-      atividade.attachmentName || 'Anexo'
-    }</strong></p>
-               <a href="${
-                 atividade.attachmentUrl
-               }" ${actionAttr} class="btn btn-info"><i class="fa-solid fa-download"></i> Baixar Anexo</a>`;
-  }
-
-  content.innerHTML = html;
-  document.getElementById('attachmentModal').classList.remove('hidden');
 };
 
-window.closeAttachmentModal = function () {
-  document.getElementById('attachmentModal').classList.add('hidden');
-};
+// =========================================================
+// TAREFAS DELEGADAS E RESPOSTAS (VISÃO DO FUNCIONÁRIO)
+// =========================================================
+window.setupFuncionarioTarefas = function() {
+  loadTarefasRecebidas();
 
-// ============ MENU MOBILE (HAMBÚRGUER) ============
-window.toggleMobileMenu = function() {
-  // Abre ou fecha a gaveta do menu e o rodapé
-  document.querySelectorAll('.sidebar-nav, .sidebar-footer').forEach(el => {
-      el.classList.toggle('open');
-  });
-};
+  const form = document.getElementById('formEntregarTarefa');
+  if (!form) return;
+  const novoForm = form.cloneNode(true);
+  form.parentNode.replaceChild(novoForm, form);
 
-document.addEventListener('click', function(e) {
-  // 1. Se clicou num link/botão do menu
-  if (e.target.closest('.nav-item')) {
-      document.querySelectorAll('.sidebar-nav, .sidebar-footer').forEach(el => el.classList.remove('open'));
-  }
-  // 2. Se o menu estiver aberto e clicou FORA do menu (na área vazia)
-  else if (!e.target.closest('.sidebar-nav') && !e.target.closest('.sidebar-footer') && !e.target.closest('.mobile-menu-toggle')) {
-      document.querySelectorAll('.sidebar-nav, .sidebar-footer').forEach(el => {
-          if (el.classList.contains('open')) {
-              el.classList.remove('open');
+  let arquivosSelecionados = [];
+  const fileInput = novoForm.querySelector('#entregarArquivos');
+  const fileListDisplay = novoForm.querySelector('#entregarArquivosLista');
+
+  if (fileInput) {
+      fileInput.addEventListener('change', function () {
+          const files = Array.from(this.files);
+          if (files.length > 3) return showToast('Máximo de 3 arquivos!', 'error');
+          arquivosSelecionados = [];
+          fileListDisplay.innerHTML = '';
+          for (let i = 0; i < files.length; i++) {
+              if (files[i].size > 1 * 1024 * 1024) return showToast(`Arquivo muito pesado!`, 'error');
+              arquivosSelecionados.push(files[i]);
+              fileListDisplay.innerHTML += `<div class="custom-file-item" style="font-size:12px; padding:5px 0;"><i class="fa-solid fa-file-lines" style="color: var(--color-info);"></i> ${files[i].name}</div>`;
           }
       });
   }
-});
 
-// =======================================================
-// LÓGICA DE INSTALAÇÃO DO APLICATIVO (PWA)
-// =======================================================
-let deferredPrompt;
-const installBanner = document.getElementById('pwa-install-banner');
-const installBtn = document.getElementById('pwa-install-btn');
-const closeBtn = document.getElementById('pwa-close-btn');
+  novoForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const btn = novoForm.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+      btn.disabled = true;
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    // Previne a barrinha feia padrão do Google Chrome
-    e.preventDefault();
-    // Guarda o evento nativo para usar quando o utilizador clicar no nosso botão
-    deferredPrompt = e;
-    
-    // Mostra o nosso banner bonito (Apenas em ecrãs de telemóvel)
-    if (window.innerWidth <= 768 && installBanner) {
-        installBanner.style.display = 'flex';
-    }
-});
+      const tarefaId = document.getElementById('entregarTarefaId').value;
+      const observacoes = document.getElementById('entregarObservacoes').value;
+      const tituloFinal = document.getElementById('entregarTitulo').value; 
 
-if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-        installBanner.style.display = 'none'; // Esconde o banner
-        if (deferredPrompt) {
-            deferredPrompt.prompt(); // Mostra a tela de instalação nativa do Android
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`Escolha do utilizador: ${outcome}`);
-            deferredPrompt = null;
-        }
-    });
-}
+      const finalizarParaRevisao = (anexosNovos) => {
+          db.collection('tarefas').doc(tarefaId.toString()).update({ 
+              status: 'em_revisao',
+              respostaFuncionario: observacoes,
+              tituloEntrega: tituloFinal,
+              attachments: anexosNovos 
+          }).then(() => {
+              
+              // 🚀 ESPIÃO: REGISTRA A ENTREGA DA TAREFA
+              if (window.registrarAcao) {
+                  window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'ENTREGAR_TAREFA', `Enviou a tarefa para revisão: ${tituloFinal}`);
+              }
 
-if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-        installBanner.style.display = 'none'; // Oculta se o utilizador não quiser instalar agora
-    });
-}
-
-// Opcional: Registar o Service Worker para garantir que o evento dispara
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Registado!'));
-}
-
-// =======================================================
-// LÓGICA DA CHAVINHA DE TEMA (DARK MODE)
-// =======================================================
-
-// 1. Função que roda quando clica na chavinha
-window.toggleDarkModeSwitch = function() {
-  // Alterna a classe no Body
-  const isDark = document.body.classList.toggle('dark-mode');
-  
-  // Guarda a preferência
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  
-  // Sincroniza o texto e ícone
-  syncThemeSwitchUI();
-};
-
-// 2. Função que arruma o visual (Texto e Ícone)
-window.syncThemeSwitchUI = function() {
-  const chk = document.getElementById('chkDarkMode');
-  const textElement = document.getElementById('themeSwitchText');
-  const iconElement = document.getElementById('themeSwitchIcon');
-  
-  const isDark = document.body.classList.contains('dark-mode');
-
-  if (chk) chk.checked = isDark;
-  
-  if (textElement) {
-      textElement.innerText = isDark ? 'Modo Claro' : 'Modo Escuro';
-      // Garante a cor via JS caso o CSS falhe
-      textElement.style.color = isDark ? '#f8fafc' : '#1e293b';
-  }
-  
-  if (iconElement) {
-      iconElement.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-      // Sol amarelo no escuro, Lua azulada no claro
-      iconElement.style.color = isDark ? '#fbbf24' : '#64748b';
-  }
-};
-
-// 3. Olheiro Automático (CORRIGIDO: Previne o Loop Infinito)
-const themeObserver = new MutationObserver(() => {
-  if (document.getElementById('chkDarkMode')) {
-      // 1. DESLIGA o observador temporariamente para não gerar loop
-      themeObserver.disconnect(); 
-      
-      // 2. Atualiza os textos e ícones em segurança
-      syncThemeSwitchUI();
-      
-      // 3. LIGA o observador novamente
-      themeObserver.observe(document.body, { childList: true, subtree: true });
-  }
-});
-// Inicia o observador pela primeira vez
-themeObserver.observe(document.body, { childList: true, subtree: true });
-
-// =======================================================
-// MOTOR PULL-TO-REFRESH (VERSÃO MOBILE FINAL)
-// =======================================================
-(function() {
-  let startY = 0;
-  let isPulling = false;
-  const el = document.getElementById('pull-to-refresh');
-
-  // 1. Início do Toque
-  window.addEventListener('touchstart', (e) => {
-      if (window.scrollY === 0) {
-          startY = e.touches[0].pageY;
-          isPulling = true;
-      }
-  }, { passive: true });
-
-  // 2. Movimento do Dedo
-  window.addEventListener('touchmove', (e) => {
-      if (!isPulling || !el) return;
-
-      const currentY = e.touches[0].pageY;
-      const diff = currentY - startY;
-
-      // Só desce se o usuário estiver puxando para baixo
-      if (diff > 0 && diff < 150) {
-          const moveY = -100 + diff; 
-          el.style.transform = `translateY(${moveY}px)`;
-          
-          // Feedback visual: vira a seta ao atingir o ponto de ativação
-          if (diff > 80) el.classList.add('ptr-flip');
-          else el.classList.remove('ptr-flip');
-      }
-  }, { passive: true });
-
-  // 3. Fim do Toque (Ação)
-  window.addEventListener('touchend', async () => {
-    if (!isPulling) return;
-    isPulling = false;
-
-    // Devolve a transição suave
-    el.style.transition = 'transform 0.3s cubic-bezier(0, 0, 0.2, 1)';
-
-    // Verifica se puxou o suficiente para disparar (80px)
-    const diff = el.getBoundingClientRect().top + 120;
-
-    if (diff > 80) {
-        const icon = el.querySelector('.ptr-icon');
-        const spinner = el.querySelector('.ptr-spinner');
-
-        if (icon) icon.style.display = 'none';
-        if (spinner) spinner.style.display = 'block';
-        
-        // Segura a bolinha visível enquanto "carrega"
-        el.style.transform = `translateY(20px)`;
-        if (navigator.vibrate) navigator.vibrate(10); // Vibra o celular
-
-        // Faz o conteúdo dar um "fade" para mostrar que recarregou
-        const palco = document.getElementById('adminConteudoDinamico') || document.getElementById('funcConteudoDinamico');
-        if (palco) {
-            palco.style.transition = 'opacity 0.2s ease';
-            palco.style.opacity = '0.3'; // Escurece a tela para dar sensação de load
-        }
-
-        // Simula um pequeno tempo (500ms) para o utilizador processar o refresh visual
-        setTimeout(() => {
-            // Atualiza os dados da tela atual
-            if (typeof refreshLiveData === 'function') refreshLiveData();
-            
-            // Garante que a aba de relatórios também seja atualizada se estiver aberta
-            if (document.getElementById('periodReport') && typeof generateReport === 'function') generateReport();
-
-            // Volta a tela ao normal (Clareia)
-            if (palco) palco.style.opacity = '1';
-
-            // Recolhe a bolinha suavemente
-            el.style.transform = `translateY(-120px)`;
-            setTimeout(() => {
-                if (icon) icon.style.display = 'block';
-                if (spinner) spinner.style.display = 'none';
-                el.classList.remove('ptr-flip');
-            }, 300);
-        }, 500); 
-    } else {
-        // Se não puxou o suficiente, apenas esconde
-        el.style.transform = `translateY(-120px)`;
-    }
-});
-})();
-
-// ============ SISTEMA DE SUB-CATEGORIAS ============
-window.buildCategorySelectOptions = function(categoriesArray) {
-    let groups = {};
-    
-    categoriesArray.forEach(cat => {
-        let g = "Outros"; // Rede de segurança para os Dropdowns
-        let sub = cat;
-        
-        if(cat.includes('::')) {
-            let parts = cat.split('::');
-            g = parts[0].trim();
-            sub = parts[1].trim();
-        }
-        
-        if(!groups[g]) groups[g] = [];
-        groups[g].push({ full: cat, sub: sub });
-    });
-
-    let html = '';
-    for (let g in groups) {
-        html += `<optgroup label="${g}">`;
-        groups[g].forEach(item => html += `<option value="${item.full}">${item.sub}</option>`);
-        html += `</optgroup>`;
-    }
-    return html;
-};
-
-window.formatCategoryName = function(catString) {
-  if (!catString) return 'Geral';
-  // Troca o "::" por uma setinha visual bonita nas tabelas
-  return catString.replace('::', ' <i class="fa-solid fa-chevron-right" style="font-size:9px; opacity:0.6; margin: 0 4px;"></i> ');
-};
-
-// ==========================================
-// REGISTRO DE AUDITORIA E STATUS ONLINE
-// ==========================================
-window.registrarAcao = function(userId, companyId, userName, acao, detalhes) {
-  // Pega a data e hora exata do Brasil (Fuso Local)
-  const dataLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString();
-
-  db.collection('acessos').add({
-      userId: userId,
-      companyId: companyId,
-      userName: userName,
-      acao: acao,
-      detalhes: detalhes,
-      timestamp: dataLocal // Salva com o fuso corrigido!
-  }).then(() => {
-      db.collection('usuarios').doc(userId.toString()).update({ isOnline: true }).catch(()=>{});
-  }).catch(err => console.error("Erro ao registrar ação:", err));
-};
-
-// =======================================================
-// INICIALIZADOR AUTOMÁTICO DE CALENDÁRIOS PREMIUM
-// =======================================================
-const observerCalendario = new MutationObserver(() => {
-  if (typeof flatpickr !== 'undefined') {
-      const datas = document.querySelectorAll('input[type="date"]:not(.flatpickr-input)');
-      if (datas.length > 0) {
-          flatpickr(datas, {
-              locale: "pt", 
-              altInput: true,         // MÁGICA: Cria uma máscara visual amigável
-              altFormat: "d/m/Y",     // O QUE O USUÁRIO VÊ: Padrão Brasileiro (18/03/2026)
-              dateFormat: "Y-m-d",    // O QUE O SISTEMA LÊ: Padrão Banco de Dados (2026-03-18)
-              disableMobile: true     // No celular, usa o calendário nativo (que já é BR por padrão)
+              showToast('Entregue! Aguardando avaliação.');
+              fecharModalTarefa();
+              fileListDisplay.innerHTML = '';
+              arquivosSelecionados = [];
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              loadTarefasRecebidas(); 
+          }).catch(err => {
+              showToast('Erro ao entregar.', 'error');
+              btn.innerHTML = originalText;
+              btn.disabled = false;
           });
-      }
-  }
-});
+      };
 
-window.addEventListener('DOMContentLoaded', () => {
-  observerCalendario.observe(document.body, { childList: true, subtree: true });
-});
+      if (arquivosSelecionados.length > 0) {
+          const promessas = arquivosSelecionados.map((file) => {
+              return new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = function (evento) { resolve({ name: file.name, url: evento.target.result }); };
+                  reader.readAsDataURL(file);
+              });
+          });
+          Promise.all(promessas).then(anexos => finalizarParaRevisao(anexos));
+      } else {
+          finalizarParaRevisao([]);
+      }
+  });
+};
+
+window.loadTarefasRecebidas = function() {
+  const container = document.getElementById('listaTarefasFuncionario');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando tarefas...</div>';
+
+  db.collection('tarefas').where('userId', '==', currentUser.id).get()
+  .then((querySnapshot) => {
+      if (querySnapshot.empty) {
+          container.innerHTML = '<div style="text-align:center; padding: 20px; background: var(--color-bg-primary); border-radius: 8px;">Nenhuma tarefa pendente. Você está em dia! 🎉</div>';
+          return;
+      }
+
+      let lista = [];
+      querySnapshot.forEach(doc => lista.push(doc.data()));
+      
+      lista.sort((a, b) => {
+          const order = { 'pendente': 1, 'em_revisao': 2, 'concluido': 3 };
+          if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+          return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      let html = `<div style="display: grid; gap: 15px;">`;
+
+      lista.forEach(t => {
+          const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
+          const admin = users.find(u => u.id === t.senderId);
+          const nomeAdmin = admin ? admin.name : 'Administrador';
+
+          const pendente = t.status === 'pendente';
+          const emRevisao = t.status === 'em_revisao';
+          
+          let corBorda = 'border-left: 4px solid var(--color-success);'; 
+          let badge = `<span class="badge" style="background:#dcfce7; color:#166534;">Concluída & Aprovada</span>`;
+          
+          if (pendente) {
+              corBorda = t.feedbackAdmin ? 'border-left: 4px solid var(--color-danger);' : 'border-left: 4px solid var(--color-warning);';
+              badge = t.feedbackAdmin 
+                  ? `<span class="badge" style="background:#fee2e2; color:#991b1b;">Devolvida c/ Erro</span>` 
+                  : `<span class="badge" style="background:#fef9c3; color:#854d0e;">Pendente</span>`;
+          } else if (emRevisao) {
+              corBorda = 'border-left: 4px solid var(--color-info);';
+              badge = `<span class="badge" style="background:#dbeafe; color:#1e40af;">Em Revisão</span>`;
+          }
+
+          html += `
+          <div class="card" style="padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; ${corBorda}">
+              <div style="flex: 1;">
+                  <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px;">De: ${nomeAdmin} • ${dataFormatada}</div>
+                  <h4 style="margin: 0 0 5px 0;">${t.title}</h4>
+                  ${badge}
+              </div>
+              <div>
+                  ${pendente
+                      ? `<button class="btn btn-primary btn-small" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-reply"></i> ${t.feedbackAdmin ? 'Ver Erro e Reenviar' : 'Abrir & Responder'}</button>`
+                      : emRevisao 
+                          ? `<button class="btn btn-info btn-small" onclick="abrirModalTarefa('${t.id}')" style="background: var(--color-info); color: white; border: none;"><i class="fa-solid fa-pen"></i> Editar Entrega</button>`
+                          : `<button class="btn btn-secondary btn-small" disabled><i class="fa-solid fa-check-double"></i> Aprovada</button>`
+                  }
+              </div>
+          </div>`;
+      });
+
+      html += `</div>`;
+      container.innerHTML = html;
+  }).catch(err => {
+      container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--color-danger);">Erro de conexão.</div>';
+  });
+};
+
+window.abrirModalTarefa = function(idTarefa) {
+  db.collection('tarefas').doc(idTarefa.toString()).get().then(docSnap => {
+      if (!docSnap.exists) return;
+      const t = docSnap.data();
+
+      const admin = users.find(u => u.id === t.senderId);
+      document.getElementById('modalTarefaRemetente').textContent = admin ? admin.name : 'Administrador';
+      document.getElementById('modalTarefaTitulo').textContent = t.title;
+      document.getElementById('modalTarefaDescricao').textContent = t.description;
+      document.getElementById('entregarTarefaId').value = t.id;
+      
+      document.getElementById('entregarTitulo').value = t.tituloEntrega || t.title; 
+      document.getElementById('entregarObservacoes').value = t.respostaFuncionario || '';
+
+      const boxFeedback = document.getElementById('boxFeedbackAdmin');
+        const txtFeedback = document.getElementById('textoFeedbackAdmin');
+        const boxAnexosFeedback = document.getElementById('anexosFeedbackAdmin'); // Captura a nova Div
+
+        if (t.feedbackAdmin && boxFeedback && txtFeedback) {
+            txtFeedback.textContent = t.feedbackAdmin;
+            
+            // Renderiza os anexos do Admin (se houver) com botões de download vermelhos
+            if (t.feedbackAttachments && t.feedbackAttachments.length > 0 && boxAnexosFeedback) {
+                let anexosHtml = '';
+                t.feedbackAttachments.forEach(an => {
+                    anexosHtml += `<a href="${an.url}" download="${an.name}" class="badge" style="background: #fca5a5; color: #7f1d1d; text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid #f87171;"><i class="fa-solid fa-download"></i> ${an.name}</a>`;
+                });
+                boxAnexosFeedback.innerHTML = anexosHtml;
+            } else if (boxAnexosFeedback) {
+                boxAnexosFeedback.innerHTML = ''; // Limpa se não houver anexos
+            }
+
+            boxFeedback.style.display = 'block';
+        } else if (boxFeedback) {
+            boxFeedback.style.display = 'none';
+        }
+
+      const boxAnexos = document.getElementById('modalTarefaAnexosAdmin');
+      if (t.attachments && t.attachments.length > 0) {
+          let anexosHtml = '<strong style="font-size:14px; display:block; margin-bottom: 5px;">Arquivos enviados pelo Administrador:</strong><div style="display: flex; gap: 10px; flex-wrap: wrap;">';
+          t.attachments.forEach(an => {
+              anexosHtml += `<a href="${an.url}" download="${an.name}" class="badge" style="background: var(--color-bg-secondary); color: var(--color-primary); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border);"><i class="fa-solid fa-download"></i> ${an.name}</a>`;
+          });
+          anexosHtml += '</div>';
+          boxAnexos.innerHTML = anexosHtml;
+      } else {
+          boxAnexos.innerHTML = '';
+      }
+
+      document.getElementById('entregarArquivosLista').innerHTML = '';
+      document.getElementById('modalResponderTarefa').classList.remove('hidden');
+  });
+};
+
+window.fecharModalTarefa = function() {
+  document.getElementById('modalResponderTarefa').classList.add('hidden');
+};
+
+// ============ CONFIGURAÇÕES DE PERFIL ============
+window.setupFuncSettingsForms = function() {
+  const profForm = document.getElementById('empProfileForm');
+  if (profForm) {
+      profForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          const newName = document.getElementById('empProfileName').value.trim();
+          const newPass = document.getElementById('empProfilePassword').value;
+          const btn = profForm.querySelector('button');
+          const originalText = btn ? btn.innerHTML : '';
+          if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
+
+          let updates = {};
+          if (newName) updates.name = newName;
+          if (newPass) updates.password = newPass;
+
+          db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
+              if (newName) {
+                  currentUser.name = newName;
+                  const sidebarName = document.getElementById('sidebarEmployeeName');
+                  if (sidebarName) sidebarName.textContent = currentUser.name.split(' ')[0];
+                  const avatar = document.getElementById('employeeAvatar');
+                  if (avatar) avatar.textContent = currentUser.name.charAt(0).toUpperCase();
+              }
+              const passInput = document.getElementById('empProfilePassword');
+              if (passInput) passInput.value = '';
+              showNotice('empProfileAlert', 'Perfil atualizado!', 'success');
+              if (btn) btn.innerHTML = originalText || '<i class="fa-solid fa-floppy-disk"></i> Atualizar';
+          });
+      });
+  }
+};
