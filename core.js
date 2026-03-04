@@ -1,12 +1,12 @@
 // ============ 1. INTEGRAÇÃO FIREBASE & EMAIL ============
 const firebaseConfig = {
-  apiKey: 'AIzaSyCzNiOwGdmaOULQ3_UMNw0TX6w3J03vXVE',
-  authDomain: 'feedbackgooficial.firebaseapp.com',
-  projectId: 'feedbackgooficial',
-  storageBucket: 'feedbackgooficial.firebasestorage.app',
-  messagingSenderId: '531915627918',
-  appId: '1:531915627918:web:5210c0851b4ae9b088d8df',
-  measurementId: 'G-6N68F5759T',
+    apiKey: "AIzaSyDNP3BqvD2udl05uIIQ4-VYqJAL7LpaKoE",
+    authDomain: "feedbackgo---game-test.firebaseapp.com",
+    projectId: "feedbackgo---game-test",
+    storageBucket: "feedbackgo---game-test.firebasestorage.app",
+    messagingSenderId: "360325357568",
+    appId: "1:360325357568:web:760dba4d389ae3b3c438e5",
+    measurementId: "G-R1WY7CLLS7"
 };
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
