@@ -144,6 +144,11 @@ window.refreshAdminDashboard = function () {
   updateAdminStats();
   loadAdminRecentActivities();
   if (typeof renderAdminCharts === 'function') renderAdminCharts();
+  
+  if (typeof window.renderRankingMensal === 'function') {
+      window.renderRankingMensal('rankingAdminContainer');
+  }
+
   const c = companies.find((x) => x.id === currentUser.companyId);
   const elAviso = document.getElementById('adminAnnouncementText');
   if (elAviso && c) elAviso.value = c.announcement || '';

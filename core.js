@@ -156,6 +156,11 @@ function refreshLiveData() {
         typeof renderAdminCharts === 'function'
       )
         renderAdminCharts();
+      if (
+        palco.querySelector('#rankingAdminContainer') && 
+        typeof renderRankingMensal === 'function'
+      ) 
+        renderRankingMensal('rankingAdminContainer');
     }
   } else {
     if (typeof updateEmployeeStats === 'function') updateEmployeeStats();
@@ -177,6 +182,11 @@ function refreshLiveData() {
         typeof renderFuncCharts === 'function'
       )
         renderFuncCharts();
+      if (
+        palcoFunc.querySelector('#rankingFuncContainer') && 
+        typeof renderRankingMensal === 'function'
+      ) 
+        renderRankingMensal('rankingFuncContainer');
     }
   }
 }
@@ -1035,12 +1045,20 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // =======================================================
-// RANKING MENSAL (CÁLCULO E EXIBIÇÃO)
+// =================== RANKING MENSAL ====================
 // =======================================================
-
 window.renderRankingMensal = function(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
+
+  // Limpa o fundo do cartão pai para a nossa nova caixa brilhar
+  const parentCard = container.closest('.card');
+  if (parentCard) {
+      parentCard.style.background = 'transparent';
+      parentCard.style.border = 'none';
+      parentCard.style.boxShadow = 'none';
+      parentCard.style.padding = '0';
+  }
 
   const hoje = new Date();
   const mesAtual = hoje.getMonth();
@@ -1066,39 +1084,60 @@ window.renderRankingMensal = function(containerId) {
       };
   }).sort((a, b) => b.xp - a.xp).slice(0, 5);
 
-  if (ranking.length === 0) {
-      container.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.6;">Ainda não há pontuação este mês.</div>';
-      return;
-  }
-
-  // 🚀 LÊ AS MOEDAS DIRETAMENTE DAS CONFIGURAÇÕES DA EMPRESA!
   const c = companies.find(x => x.id === currentUser.companyId);
   const regras = (c && c.gamificacao) ? c.gamificacao : {};
   const premios = [
-      regras.premioTop1 || 500, 
-      regras.premioTop2 || 400, 
-      regras.premioTop3 || 300, 
-      regras.premioTop4 || 200, 
-      regras.premioTop5 || 100
+      regras.premioTop1 || 500, regras.premioTop2 || 400, 
+      regras.premioTop3 || 300, regras.premioTop4 || 200, regras.premioTop5 || 100
   ];
-  
-  const cores = ['#fbbf24', '#94a3b8', '#b45309', '#3b82f6', '#10b981'];
 
-  let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
-  ranking.forEach((user, index) => {
-      html += `
-      <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-primary); padding: 12px 16px; border-radius: 12px; border-left: 4px solid ${cores[index]};">
-          <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="width: 28px; height: 28px; border-radius: 50%; background: ${cores[index]}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">${index + 1}º</div>
-              <strong>${user.nome}</strong>
-          </div>
-          <div style="text-align: right;">
-              <span style="display: block; font-weight: 800; color: var(--color-primary);">${user.xp} XP</span>
-              <span style="font-size: 11px; opacity: 0.8;"><i class="fa-solid fa-coins" style="color: #fbbf24;"></i> +${premios[index]} Coins</span>
-          </div>
-      </div>`;
+  let html = `
+  <div style="background: var(--color-bg-secondary); border-radius: 16px; border: 1px solid var(--color-border); padding: 25px 15px 0 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: sans-serif; overflow-x: auto;">
+      <h3 style="margin: 0 0 20px 10px; font-size: 16px; font-weight: 700; color: var(--color-text-primary);"><i class="fa-solid fa-trophy" style="color: #fbbf24;"></i> Pódio Mensal</h3>
+      
+      <div style="min-width: 480px;"> <div style="display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; gap: 4px; border-bottom: 4px solid var(--color-border); padding-bottom: 0; min-height: 280px;">
+  `;
+
+  // 🚀 A MÁGICA: Mapeia o array na ordem do seu desenho (4º, 2º, 1º, 3º, 5º)
+  const posicoes = [
+      { user: ranking[3], label: '4º', h: '60px', bg: 'linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%)', corTxt: '#1e3a8a', idxCoins: 3 },
+      { user: ranking[1], label: '2º', h: '110px', bg: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%)', corTxt: '#1e293b', idxCoins: 1 },
+      { user: ranking[0], label: '1º', h: '160px', bg: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 100%)', corTxt: '#78350f', crown: true, idxCoins: 0 },
+      { user: ranking[2], label: '3º', h: '85px', bg: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)', corTxt: '#fff', idxCoins: 2 },
+      { user: ranking[4], label: '5º', h: '40px', bg: 'linear-gradient(180deg, #34d399 0%, #10b981 100%)', corTxt: '#064e3b', idxCoins: 4 }
+  ];
+
+  posicoes.forEach((col) => {
+      if (col.user) {
+          html += `
+          <div style="display: flex; flex-direction: column; align-items: center; position: relative;">
+              ${col.crown ? '<i class="fa-solid fa-crown" style="color: #fbbf24; font-size: 32px; margin-bottom: -5px; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));"></i>' : ''}
+
+              <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--color-bg-primary); border: 3px solid ${col.bg.split(' ')[2]}; color: var(--color-text-primary); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; z-index: 2; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">${col.user.avatar}</div>
+
+              <div style="font-size: 13px; font-weight: 800; margin: 8px 0 2px 0; color: var(--color-text-primary); text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${col.user.nome}</div>
+
+              <div style="font-size: 12px; font-weight: 900; color: var(--color-primary); margin-bottom: 2px;">${col.user.xp} XP</div>
+              <div style="font-size: 10px; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 2px 6px; border-radius: 6px; margin-bottom: 8px;">+${premios[col.idxCoins]} <i class="fa-solid fa-coins"></i></div>
+
+              <div style="height: ${col.h}; width: 100%; background: ${col.bg}; border-radius: 8px 8px 0 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 10px; color: ${col.corTxt}; font-size: 28px; font-weight: 900; box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 -2px 10px rgba(0,0,0,0.1);">
+                  ${col.label}
+              </div>
+          </div>`;
+      } else {
+          // Se o degrau estiver vazio, desenha um "Pilar Fantasma" para manter a estrutura e incentivar a jogar!
+          html += `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+              <div style="height: ${col.h}; width: 100%; background: rgba(0,0,0,0.02); border-radius: 8px 8px 0 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 10px; color: rgba(0,0,0,0.1); font-size: 24px; font-weight: 900; border: 2px dashed var(--color-border); border-bottom: none;">${col.label}</div>
+          </div>`;
+      }
   });
-  html += '</div>';
+
+  html += `
+          </div>
+      </div>
+  </div>`;
+  
   container.innerHTML = html;
 };
 

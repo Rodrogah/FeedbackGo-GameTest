@@ -57,6 +57,10 @@ async function showEmployeeSection(sec) {
       if (typeof window.atualizarPainelGamificacao === 'function') {
           window.atualizarPainelGamificacao();
       }
+      
+      if (typeof window.renderRankingMensal === 'function') {
+          window.renderRankingMensal('rankingFuncContainer');
+      }
 
     } else if (sec === 'new-task') {
       
