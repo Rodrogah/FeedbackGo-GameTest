@@ -23,6 +23,20 @@ async function showAdminSection(sec) {
   const activeNav = document.querySelector(`#adminPanel .nav-item[onclick*="${sec}"]`);
   if (activeNav) activeNav.classList.add('active');
 
+  // Verifica se a gamificação está ativa
+  const c = companies.find((x) => x.id === currentUser.companyId);
+  const isGamiAtiva = c && c.gamificationEnabled === true;
+  
+  // Esconde ou mostra o menu da loja
+  const menuLojaAdmin = document.querySelector('#adminPanel .nav-item[onclick*="store"]');
+  if (menuLojaAdmin) menuLojaAdmin.style.display = isGamiAtiva ? 'flex' : 'none';
+  
+  // Esconde o ranking do dashboard do admin se desativado
+  setTimeout(() => {
+      const rankingAdmin = document.getElementById('rankingAdminContainer');
+      if (rankingAdmin && !isGamiAtiva) rankingAdmin.parentElement.style.display = 'none';
+  }, 100);
+
   palco.style.transition = 'opacity 0.2s ease';
   palco.style.opacity = '0';
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -39,9 +53,10 @@ async function showAdminSection(sec) {
       teams: 'admin-equipes.html',
       reports: 'admin-relatorios.html',
       settings: 'admin-configuracoes.html',
-      delegar: 'admin-delegar.html'
+      delegar: 'admin-delegar.html',
+      store: 'admin-loja.html'
     };
-    
+
     const resposta = await fetch(`./telas/${rotas[sec]}`);
     if (!resposta.ok) throw new Error('Ficheiro não encontrado.');
     palco.innerHTML = await resposta.text();
@@ -96,6 +111,9 @@ async function showAdminSection(sec) {
           (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
       }
 
+    } else if (sec === 'store') {
+      if (typeof setupAdminStore === 'function') setupAdminStore();
+
     } else if (sec === 'settings') {
       const compInput = document.getElementById('settingsCompanyName');
       if (compInput) compInput.value = c.name;
@@ -103,6 +121,9 @@ async function showAdminSection(sec) {
       if (profileInput) profileInput.value = currentUser.name;
       loadCategories(c);
       setupAdminSettingsForms();
+      
+      if (typeof window.setupAdminGamification === 'function') window.setupAdminGamification();
+      
     } else if (sec === 'delegar') {
       const catEl = document.getElementById('delegarCategoria');
       if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); // <--- AQUI TAMBÉM
@@ -112,6 +133,11 @@ async function showAdminSection(sec) {
   } catch (err) {
     palco.innerHTML = `<div class="alert alert-error">Erro ao carregar ecrã: ${err.message}</div>`;
   }
+  setTimeout(() => {
+    if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
+        window.aplicarVisibilidadeGamificacao();
+    }
+}, 200);
 }
 
 window.refreshAdminDashboard = function () {
@@ -968,118 +994,219 @@ if (editUserForm) {
   });
 }
 
-// CONFIGURAÇÃO DO FORMULÁRIO DE DELEGAÇÃO (COM DIFICULDADE)
+// =========================================================
+// SISTEMA DE DELEGAÇÃO DE TAREFAS (GESTOR DE EQUIPES)
+// =========================================================
+
 function setupAdminDelegarForm() {
   const container = document.getElementById('listaCheckFuncionarios');
   if (!container) return;
 
   const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active && u.id !== currentUser.id);
-  container.innerHTML = funcDaEmpresa.map(u => `
-      <label class="green-dot-item" style="margin-bottom:5px; padding:10px;">
-          <input type="checkbox" name="funcDelegado" value="${u.id}" class="input-hidden">
-          <div style="display:flex; align-items:center; gap:10px;">
-              <div class="dot"></div>
-              <span style="font-size:14px;">${u.name} <small>(${u.team || 'Geral'})</small></span>
+
+  if (funcDaEmpresa.length === 0) {
+      container.innerHTML = '<p style="opacity: 0.6; text-align: center; padding: 10px;">Nenhum colaborador encontrado.</p>';
+  } else {
+      container.innerHTML = funcDaEmpresa.map(u => `
+          <div style="margin-bottom: 8px;">
+              <input type="checkbox" name="funcDelegado" value="${u.id}" id="checkFunc_${u.id}" class="input-hidden" style="display: none;">
+              <label for="checkFunc_${u.id}" class="green-dot-item">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                      <div class="dot"></div>
+                      <span style="font-size: 14px;"><strong>${u.name}</strong> <small style="opacity:0.7">(${u.team || 'Sem Equipe'})</small></span>
+                  </div>
+              </label>
           </div>
-      </label>
-  `).join('');
+      `).join('');
+  }
 
   const form = document.getElementById('formDelegarTarefa');
+  if (!form) return;
   const novoForm = form.cloneNode(true);
   form.parentNode.replaceChild(novoForm, form);
 
-  // INJETA O SELECT DE DIFICULDADE NO HTML
-  const areaArquivos = novoForm.querySelector('.file-drop-area').parentNode;
-  const divDif = document.createElement('div');
-  divDif.className = 'form-group';
-  divDif.style.marginTop = "15px";
-  divDif.innerHTML = `
-      <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
-      <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary);">
-          <option value="2">Fácil (Peso 2 - 100 XP)</option>
-          <option value="3" selected>Média (Peso 3 - 150 XP)</option>
-          <option value="4">Difícil (Peso 4 - 200 XP)</option>
-      </select>
-  `;
-  areaArquivos.parentNode.insertBefore(divDif, areaArquivos.nextSibling);
+  // 🎮 INJETA O CAMPO DE DIFICULDADE (GAMIFICAÇÃO)
+  const areaArquivos = novoForm.querySelector('.file-drop-area');
+  if (areaArquivos && !document.getElementById('boxDificuldadeGamificacao')) {
+      const c = companies.find(x => x.id === currentUser.companyId);
+      const isGamiAtiva = c && c.gamificationEnabled === true;
+
+      const formGroupArquivos = areaArquivos.parentNode;
+      const divDif = document.createElement('div');
+      divDif.className = 'form-group';
+      divDif.id = 'boxDificuldadeGamificacao'; // ID adicionado para controle
+      divDif.style.marginTop = "15px";
+      divDif.style.display = isGamiAtiva ? 'block' : 'none'; // Esconde se estiver desativado!
+      
+      divDif.innerHTML = `
+          <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
+          <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.05);">
+              <option value="2">Fácil (Peso 2 - 100 XP)</option>
+              <option value="3" selected>Média (Peso 3 - 150 XP)</option>
+              <option value="4">Difícil (Peso 4 - 200 XP)</option>
+          </select>
+      `;
+      formGroupArquivos.parentNode.insertBefore(divDif, formGroupArquivos.nextSibling);
+  }
+
+  let arquivosSelecionados = [];
+  const fileInput = novoForm.querySelector('#delegarArquivos');
+  const fileListDisplay = novoForm.querySelector('#delegarArquivosLista');
+
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      const files = Array.from(this.files);
+      if (files.length > 3) {
+        showToast('Máximo de 3 arquivos!', 'error');
+        this.value = '';
+        fileListDisplay.innerHTML = '';
+        arquivosSelecionados = [];
+        return;
+      }
+      arquivosSelecionados = [];
+      fileListDisplay.innerHTML = '';
+
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].size > 1 * 1024 * 1024) {
+          showToast(`O arquivo ${files[i].name} é muito pesado (Máx 1MB)!`, 'error');
+          this.value = '';
+          fileListDisplay.innerHTML = '';
+          arquivosSelecionados = [];
+          return;
+        }
+        arquivosSelecionados.push(files[i]);
+        fileListDisplay.innerHTML += `<div class="custom-file-item" style="font-size:12px; padding:5px 0;"><i class="fa-solid fa-file-lines" style="color: var(--color-info);"></i> ${files[i].name}</div>`;
+      }
+    });
+  }
 
   novoForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      const selecionados = novoForm.querySelectorAll('input[name="funcDelegado"]:checked');
-      if (selecionados.length === 0) return showToast('Selecione alguém!', 'error');
+      
+      const checkboxes = novoForm.querySelectorAll('input[name="funcDelegado"]:checked');
+      if (checkboxes.length === 0) return showToast('Selecione pelo menos um funcionário!', 'error');
 
       const btn = novoForm.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Enviar...';
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Missões...';
 
-      const dados = {
-          titulo: document.getElementById('delegarTitulo').value,
-          desc: document.getElementById('delegarDescricao').value,
-          cat: document.getElementById('delegarCategoria').value,
-          dif: parseInt(document.getElementById('delegarDificuldade').value)
+      const titulo = document.getElementById('delegarTitulo').value;
+      const descricao = document.getElementById('delegarDescricao').value;
+      const categoria = document.getElementById('delegarCategoria').value;
+      
+      // Captura o peso, mas se não achar usa 3 por padrão
+      const difSelect = document.getElementById('delegarDificuldade');
+      const dificuldade = difSelect ? parseInt(difSelect.value) : 3;
+      const dataAtual = new Date().toISOString();
+
+      const dispararTarefas = (anexosProntos) => {
+          let promessasFirebase = [];
+          
+          checkboxes.forEach((box, index) => {
+              const userId = parseInt(box.value);
+              const tarefaId = Date.now() + index; 
+              
+              const novaTarefa = {
+                  id: tarefaId,
+                  companyId: currentUser.companyId,
+                  senderId: currentUser.id,
+                  userId: userId,
+                  title: titulo,
+                  description: descricao,
+                  category: categoria,
+                  dificuldade: dificuldade,
+                  attachments: anexosProntos || [],
+                  status: 'pendente', 
+                  createdAt: dataAtual
+              };
+
+              promessasFirebase.push(db.collection('tarefas').doc(tarefaId.toString()).set(novaTarefa));
+          });
+
+          Promise.all(promessasFirebase).then(() => {
+              if (window.registrarAcao) window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'DELEGAR_TAREFA', `Delegou a tarefa: ${titulo}`);
+              showToast('Tarefas enviadas com sucesso!');
+              novoForm.reset();
+              fileListDisplay.innerHTML = ''; 
+              arquivosSelecionados = []; 
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              loadTarefasEnviadas(); 
+          }).catch((err) => {
+              showToast('Erro ao enviar.', 'error');
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+          });
       };
 
-      let promessas = [];
-      selecionados.forEach((box, i) => {
-          const tarefaId = Date.now() + i;
-          promessas.push(db.collection('tarefas').doc(tarefaId.toString()).set({
-              id: tarefaId,
-              companyId: currentUser.companyId,
-              senderId: currentUser.id,
-              userId: parseInt(box.value),
-              title: dados.titulo,
-              description: dados.desc,
-              category: dados.cat,
-              dificuldade: dados.dif,
-              status: 'pendente',
-              createdAt: new Date().toISOString()
-          }));
-      });
-
-      Promise.all(promessas).then(() => {
-          showToast('Missões delegadas com sucesso!');
-          novoForm.reset();
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Tarefa';
-          loadTarefasEnviadas();
-      });
+      if (arquivosSelecionados && arquivosSelecionados.length > 0) {
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Anexando...';
+          const promessasDeArquivos = arquivosSelecionados.map((file) => {
+              return new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = function (evento) { resolve({ name: file.name, url: evento.target.result }); };
+                  reader.readAsDataURL(file);
+              });
+          });
+          Promise.all(promessasDeArquivos).then((anexos) => dispararTarefas(anexos));
+      } else {
+          dispararTarefas([]); 
+      }
   });
 }
 
 // APROVAÇÃO E DEPÓSITO DE XP/MOEDAS
 window.aprovarTarefaRevisao = function() {
   const idT = document.getElementById('detalhesTarefaId').value;
+  
   db.collection('tarefas').doc(idT).get().then(snap => {
       const t = snap.data();
-      const xpGanho = 50 * (t.dificuldade || 3);
-
-      const p1 = db.collection('tarefas').doc(idT).update({ status: 'concluido' });
       
-      const p2 = db.collection('atividades').doc(Date.now().toString()).set({
-          ...t, id: Date.now(), date: new Date().toISOString().split('T')[0],
-          status: 'concluido', xpEarned: xpGanho, tarefaVinculadaId: idT
-      });
+      db.collection('empresas').doc(t.companyId.toString()).get().then(compSnap => {
+          const dataEmpresa = compSnap.data();
+          const gamificacaoAtiva = dataEmpresa.gamificationEnabled === true;
+          
+          const regras = dataEmpresa.gamificacao || { xpBase: 50, xpNivel: 500, coinsNivel: 100, pesoFacil: 2, pesoMedia: 3, pesoDificil: 4 };
 
-      const p3 = db.collection('usuarios').doc(t.userId.toString()).get().then(uSnap => {
-          const u = uSnap.data();
-          let newXp = (u.xp || 0) + xpGanho;
-          let oldLevel = u.level || 1;
-          let newLevel = Math.floor(newXp / 500) + 1;
-          let newCoins = u.goCoins || 0;
-
-          if (newLevel > oldLevel) {
-              newCoins += (newLevel - oldLevel) * 100; // +100 por nível
+          // Se estiver desativada, ganha 0 pontos. Se não, faz a conta.
+          let xpGanho = 0;
+          if (gamificacaoAtiva) {
+              let peso = regras.pesoMedia;
+              if(t.dificuldade == 2 || t.dificuldade === 'facil') peso = regras.pesoFacil;
+              if(t.dificuldade == 4 || t.dificuldade === 'dificil') peso = regras.pesoDificil;
+              xpGanho = Math.round(regras.xpBase * peso);
           }
 
-          return db.collection('usuarios').doc(t.userId.toString()).update({
-              xp: newXp, level: newLevel, goCoins: newCoins
+          const p1 = db.collection('tarefas').doc(idT).update({ status: 'concluido' });
+          
+          const p2 = db.collection('atividades').doc(Date.now().toString()).set({
+              ...t, id: Date.now(), date: new Date().toISOString().split('T')[0],
+              status: 'concluido', xpEarned: xpGanho, tarefaVinculadaId: idT
           });
-      });
 
-      Promise.all([p1, p2, p3]).then(() => {
-          showToast(`Aprovado! +${xpGanho} XP para o colaborador.`);
-          fecharDetalhesTarefa();
-          loadTarefasEnviadas();
+          // Se estiver desativada, simplesmente não mexe na conta do usuário (Resolve Promise vazia)
+          let p3 = Promise.resolve();
+          if (gamificacaoAtiva) {
+              p3 = db.collection('usuarios').doc(t.userId.toString()).get().then(uSnap => {
+                  const u = uSnap.data();
+                  let newXp = (u.xp || 0) + xpGanho;
+                  let oldLevel = u.level || 1;
+                  let newLevel = Math.floor(newXp / regras.xpNivel) + 1;
+                  let newCoins = u.goCoins || 0;
+
+                  if (newLevel > oldLevel) newCoins += (newLevel - oldLevel) * regras.coinsNivel; 
+
+                  return db.collection('usuarios').doc(t.userId.toString()).update({ xp: newXp, level: newLevel, goCoins: newCoins });
+              });
+          }
+
+          Promise.all([p1, p2, p3]).then(() => {
+              const msg = gamificacaoAtiva ? `Aprovado! +${xpGanho} XP enviados.` : `Tarefa aprovada e concluída com sucesso!`;
+              showToast(msg);
+              fecharDetalhesTarefa();
+              loadTarefasEnviadas();
+          });
       });
   });
 };
@@ -1519,4 +1646,293 @@ window.fecharModalAcessos = function() {
 
 window.fecharModalAcessos = function() {
   document.getElementById('modalAcessos').classList.add('hidden');
+};
+
+// =======================================================
+// LOJA DE RECOMPENSAS (VISÃO DO GESTOR)
+// =======================================================
+
+// 1. Controle das Abas Internas (Catálogo / Pedidos)
+window.openStoreTab = function(tabId, btn) {
+  document.querySelectorAll('.store-section').forEach(el => el.style.display = 'none');
+  document.getElementById(tabId).style.display = 'block';
+  
+  document.querySelectorAll('.internal-tabs-nav .tab-btn').forEach(el => el.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  
+  if (tabId === 'tabCatalogo') loadAdminRewards();
+  if (tabId === 'tabResgates') loadAdminRedemptions();
+};
+
+// 2. Inicializador da Loja e Cadastro de Prémios
+window.setupAdminStore = function() {
+  loadAdminRewards(); // Carrega a lista ao abrir o ecrã
+
+  const form = document.getElementById('adminNewRewardForm');
+  if (!form) return;
+  const novoForm = form.cloneNode(true);
+  form.parentNode.replaceChild(novoForm, form);
+
+  novoForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = novoForm.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Guardar...';
+      btn.disabled = true;
+
+      const premio = {
+          id: Date.now(),
+          companyId: currentUser.companyId,
+          nome: document.getElementById('rewardName').value.trim(),
+          preco: parseInt(document.getElementById('rewardPrice').value),
+          descricao: document.getElementById('rewardDesc').value.trim(),
+          ativo: true,
+          createdAt: new Date().toISOString()
+      };
+
+      db.collection('premios').doc(premio.id.toString()).set(premio).then(() => {
+          showToast('Prémio adicionado ao catálogo!');
+          novoForm.reset();
+          loadAdminRewards();
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      }).catch(err => {
+          showToast('Erro ao guardar prémio', 'error');
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      });
+  });
+};
+
+// 3. Renderizar o Catálogo de Prémios
+window.loadAdminRewards = function() {
+  const container = document.getElementById('adminRewardsList');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> A carregar catálogo...</div>';
+
+  db.collection('premios').where('companyId', '==', currentUser.companyId).get().then(snap => {
+      if (snap.empty) {
+          container.innerHTML = '<div style="padding:15px; text-align:center; opacity:0.6;">Nenhum prémio cadastrado no seu cofre.</div>';
+          return;
+      }
+      
+      // Ordena para que os mais baratos apareçam primeiro
+      let premios = [];
+      snap.forEach(doc => premios.push(doc.data()));
+      premios.sort((a, b) => a.preco - b.preco);
+
+      let html = '';
+      premios.forEach(p => {
+          const btnStatus = p.ativo 
+              ? `<button class="btn btn-small" style="background:#fca5a5; color:#7f1d1d; border:none;" onclick="togglePremioStatus(${p.id}, false)">Ocultar</button>`
+              : `<button class="btn btn-small" style="background:#86efac; color:#14532d; border:none;" onclick="togglePremioStatus(${p.id}, true)">Mostrar na Loja</button>`;
+          
+          html += `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; border:1px solid var(--color-border); border-radius:8px; background: ${p.ativo ? 'var(--color-bg-secondary)' : 'rgba(0,0,0,0.05)'}; opacity: ${p.ativo ? '1' : '0.6'}; transition: 0.2s;">
+              <div style="flex: 1;">
+                  <h4 style="margin:0 0 5px 0; color: var(--color-text-primary);"><i class="fa-solid fa-gift" style="color: var(--color-primary); margin-right: 5px;"></i> ${p.nome}</h4>
+                  <p style="margin:0; font-size:12px; color:var(--color-text-secondary);">${p.descricao || 'Sem descrição detalhada.'}</p>
+                  <span style="display:inline-block; margin-top:8px; font-weight:800; color:#b45309; background:#fef3c7; padding:4px 10px; border-radius:12px; font-size:12px;"><i class="fa-solid fa-coins"></i> ${p.preco} Coins</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                  ${btnStatus}
+                  <button class="btn btn-small btn-danger" onclick="excluirPremio(${p.id})"><i class="fa-solid fa-trash"></i></button>
+              </div>
+          </div>`;
+      });
+      container.innerHTML = html;
+  });
+};
+
+window.togglePremioStatus = function(id, status) {
+  db.collection('premios').doc(id.toString()).update({ ativo: status }).then(() => loadAdminRewards());
+};
+
+window.excluirPremio = function(id) {
+  if(confirm("Tem a certeza que deseja excluir este prémio permanentemente?")) {
+      db.collection('premios').doc(id.toString()).delete().then(() => {
+          showToast('Prémio excluído!');
+          loadAdminRewards();
+      });
+  }
+};
+
+// 4. Renderizar e Gerir Pedidos de Resgate
+window.loadAdminRedemptions = function() {
+  const container = document.getElementById('adminRedemptionList');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> A buscar pedidos...</div>';
+
+  db.collection('resgates').where('companyId', '==', currentUser.companyId).where('status', '==', 'pendente').get().then(snap => {
+      if (snap.empty) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.6; background:var(--color-bg-secondary); border-radius:8px;">Nenhum pedido pendente de entrega.</div>';
+          return;
+      }
+      
+      let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
+      snap.forEach(doc => {
+          const r = doc.data();
+          const func = users.find(u => u.id === r.userId);
+          const nomeFunc = func ? func.name : 'Colaborador';
+          const dataPedido = new Date(r.createdAt).toLocaleDateString('pt-BR');
+
+          html += `
+          <div style="border-left: 4px solid var(--color-warning); background: var(--color-bg-secondary); padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+              <div>
+                  <div style="font-size: 11px; color: var(--color-text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">🗓️ Pedido em: ${dataPedido}</div>
+                  <h4 style="margin: 0 0 5px 0; color: var(--color-text-primary);">${r.premioNome}</h4>
+                  <p style="margin:0 0 3px 0; font-size: 13px; color: var(--color-text-secondary);"><strong>Colaborador:</strong> ${nomeFunc}</p>
+                  <p style="margin:0; font-size: 13px;"><strong>Custo de Resgate:</strong> <i class="fa-solid fa-coins" style="color:#fbbf24;"></i> ${r.preco} Coins</p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-small btn-success" onclick="aprovarResgate(${r.id}, ${r.preco})"><i class="fa-solid fa-check"></i> Entregue</button>
+                  <button class="btn btn-small btn-danger" onclick="recusarResgate(${r.id}, ${r.userId}, ${r.preco})"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+              </div>
+          </div>`;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+  });
+};
+
+window.aprovarResgate = function(resgateId, preco) {
+  if(confirm('Ao clicar em OK, você confirma que o prémio já foi entregue ao funcionário (ex: Vale enviado por email). Confirmar?')) {
+      // Marca como aprovado e debita o valor do Banco da Empresa
+      db.collection('resgates').doc(resgateId.toString()).update({ status: 'aprovado', dataAprovacao: new Date().toISOString() }).then(() => {
+          db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
+              let bank = doc.data().companyBank || 0;
+              db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
+                  showToast('Resgate concluído e entregue!');
+                  loadAdminRedemptions();
+              });
+          });
+      });
+  }
+};
+
+window.recusarResgate = function(resgateId, userId, preco) {
+  if(confirm('Cancelar pedido e devolver as moedas para o colaborador?')) {
+      // Marca como recusado e devolve o dinheiro ao funcionário
+      db.collection('resgates').doc(resgateId.toString()).update({ status: 'recusado' }).then(() => {
+          db.collection('usuarios').doc(userId.toString()).get().then(doc => {
+              let coins = doc.data().goCoins || 0;
+              db.collection('usuarios').doc(userId.toString()).update({ goCoins: coins + preco }).then(() => {
+                  showToast('Pedido cancelado. Moedas devolvidas!');
+                  loadAdminRedemptions();
+              });
+          });
+      });
+  }
+};
+
+// Alternador de Sub-abas da Gamificação
+window.openGamiTab = function(tabId, btnElement) {
+  // Esconde todas as sub-abas
+  document.querySelectorAll('.gami-internal-section').forEach(sec => {
+      sec.style.display = 'none';
+  });
+  
+  // Mostra a aba clicada
+  document.getElementById(tabId).style.display = 'block';
+  
+  // Remove a classe 'active' de todos os botões e adiciona no clicado
+  const botoes = btnElement.parentElement.querySelectorAll('.tab-btn');
+  botoes.forEach(b => b.classList.remove('active'));
+  btnElement.classList.add('active');
+};
+
+// =======================================================
+// GAMIFICAÇÃO - FUNÇÕES DIRETAS (SEM FORMULÁRIOS)
+// =======================================================
+
+// 1. CARREGA OS DADOS AO ABRIR A ABA
+window.setupAdminGamification = function() {
+  db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
+      if (doc.exists) {
+          const data = doc.data();
+          const isAtiva = data.gamificationEnabled === true;
+          // Carrega com os novos prêmios por padrão caso a empresa não os tenha
+          const regras = data.gamificacao || { 
+              xpBase: 50, xpNivel: 500, coinsNivel: 100, 
+              pesoFacil: 2, pesoMedia: 3, pesoDificil: 4,
+              premioTop1: 500, premioTop2: 400, premioTop3: 300, premioTop4: 200, premioTop5: 100
+          };
+
+          const chk = document.getElementById('chkGamificacaoMaster');
+          if (chk) chk.checked = isAtiva;
+          
+          const area = document.getElementById('gamiSettingsArea');
+          if (area) area.style.display = isAtiva ? 'block' : 'none';
+
+          // Preenche todos os inputs
+          const campos = ['gamiXpBase', 'gamiXpNivel', 'gamiCoinsNivel', 'gamiPesoFacil', 'gamiPesoMedia', 'gamiPesoDificil', 'gamiPremioTop1', 'gamiPremioTop2', 'gamiPremioTop3', 'gamiPremioTop4', 'gamiPremioTop5'];
+          
+          campos.forEach(id => {
+              if(document.getElementById(id)) {
+                  // Pega o ID (ex: gamiPremioTop1) e converte na chave do banco (premioTop1)
+                  const key = id.replace('gami', '');
+                  const finalKey = key.charAt(0).toLowerCase() + key.slice(1);
+                  document.getElementById(id).value = regras[finalKey];
+              }
+          });
+          
+          if (document.getElementById('gamiToggleIcon')) document.getElementById('gamiToggleIcon').style.color = isAtiva ? 'var(--color-success)' : 'var(--color-danger)';
+          if (document.getElementById('gamiToggleText')) document.getElementById('gamiToggleText').innerText = isAtiva ? 'Gamificação Ativada' : 'Gamificação Desativada';
+      }
+  });
+};
+
+// 2. DISPARADO AO CLICAR NA CHAVINHA
+window.alternarChaveGamificacao = function(checkboxElement) {
+  const isAtiva = checkboxElement.checked;
+  
+  document.getElementById('gamiSettingsArea').style.display = isAtiva ? 'block' : 'none';
+  document.getElementById('gamiToggleIcon').style.color = isAtiva ? 'var(--color-success)' : 'var(--color-danger)';
+  document.getElementById('gamiToggleText').innerText = isAtiva ? 'Gamificação Ativada' : 'Gamificação Desativada';
+
+  db.collection('empresas').doc(currentUser.companyId.toString()).set({ gamificationEnabled: isAtiva }, { merge: true }).then(() => {
+      const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
+      if (compIndex !== -1) companies[compIndex].gamificationEnabled = isAtiva;
+      
+      if (typeof window.aplicarVisibilidadeGamificacao === 'function') window.aplicarVisibilidadeGamificacao();
+      showToast(isAtiva ? 'Módulo ATIVADO!' : 'Módulo DESATIVADO!');
+  });
+};
+
+// 3. DISPARADO AO CLICAR EM SALVAR
+window.salvarRegrasGamificacao = function(btnElement) {
+  const txtOriginal = btnElement.innerHTML;
+  btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+  btnElement.disabled = true;
+
+  // Recolhe todos os valores
+  const novasRegras = {
+      xpBase: parseInt(document.getElementById('gamiXpBase').value) || 50,
+      xpNivel: parseInt(document.getElementById('gamiXpNivel').value) || 500,
+      coinsNivel: parseInt(document.getElementById('gamiCoinsNivel').value) || 100,
+      pesoFacil: parseFloat(document.getElementById('gamiPesoFacil').value) || 2,
+      pesoMedia: parseFloat(document.getElementById('gamiPesoMedia').value) || 3,
+      pesoDificil: parseFloat(document.getElementById('gamiPesoDificil').value) || 4,
+      premioTop1: parseInt(document.getElementById('gamiPremioTop1').value) || 500,
+      premioTop2: parseInt(document.getElementById('gamiPremioTop2').value) || 400,
+      premioTop3: parseInt(document.getElementById('gamiPremioTop3').value) || 300,
+      premioTop4: parseInt(document.getElementById('gamiPremioTop4').value) || 200,
+      premioTop5: parseInt(document.getElementById('gamiPremioTop5').value) || 100
+  };
+
+  db.collection('empresas').doc(currentUser.companyId.toString()).set({ gamificacao: novasRegras }, { merge: true }).then(() => {
+      const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
+      if (compIndex !== -1) companies[compIndex].gamificacao = novasRegras;
+
+      showToast('Regras atualizadas!');
+      btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+      
+      // Atualiza os rankings na tela para refletir os novos valores imediatamente
+      if(typeof window.renderRankingMensal === 'function') {
+          window.renderRankingMensal('rankingAdminContainer');
+          window.renderRankingMensal('rankingFuncContainer');
+      }
+
+      setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
+  });
 };

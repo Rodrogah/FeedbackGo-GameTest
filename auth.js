@@ -12,14 +12,15 @@ document.getElementById('registerForm').addEventListener('submit', function (e) 
   btn.disabled = true;
 
   const nComp = {
-      id: nextCompanyId,
-      name: document.getElementById('companyName').value.trim(),
-      accessCode: 'EMP-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
-      createdAt: new Date().toISOString(),
-      teams: ['Equipe Geral'],
-      categories: [...defaultCategories],
-      companyBank: 0,
-  };
+    id: nextCompanyId,
+    name: document.getElementById('companyName').value.trim(),
+    accessCode: 'EMP-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+    createdAt: new Date().toISOString(),
+    teams: ['Equipe Geral'],
+    categories: [...defaultCategories],
+    companyBank: 0,
+    gamificationEnabled: false
+};
 
   const nUser = {
       id: nextUserId,

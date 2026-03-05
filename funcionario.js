@@ -20,7 +20,8 @@ async function showEmployeeSection(sec) {
       'new-task': 'func-nova-atividade.html',
       history: 'func-historico.html',
       settings: 'func-configuracoes.html',
-      'tarefas-recebidas': 'func-tarefas-recebidas.html'
+      'tarefas-recebidas': 'func-tarefas-recebidas.html',
+      store: 'func-loja.html'
     };
     
     const resposta = await fetch(`./telas/${rotas[sec]}`);
@@ -87,10 +88,36 @@ async function showEmployeeSection(sec) {
 
     } else if (sec === 'tarefas-recebidas') {
       setupFuncionarioTarefas();
+    } else if (sec === 'store') {
+      if (typeof setupFuncStore === 'function') setupFuncStore();
     }
+
   } catch (err) {
     palco.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
   }
+  // Verifica a chave mestra da empresa
+  const c = companies.find((x) => x.id === currentUser.companyId);
+  const isGamiAtiva = c && c.gamificationEnabled === true;
+
+  // 1. Oculta ou exibe o Menu da Loja
+  const menuLojaFunc = document.querySelector('#employeePanel .nav-item[onclick*="store"]');
+  if (menuLojaFunc) menuLojaFunc.style.display = isGamiAtiva ? 'flex' : 'none';
+
+  // 2. Se for o Dashboard, oculta ou exibe as barras e o ranking
+  if (sec === 'dashboard') {
+      setTimeout(() => {
+          const barraXp = document.getElementById('xpProgressBar');
+          if (barraXp) barraXp.closest('.card').style.display = isGamiAtiva ? 'flex' : 'none';
+          
+          const rankingFunc = document.getElementById('rankingFuncContainer');
+          if (rankingFunc) rankingFunc.parentElement.style.display = isGamiAtiva ? 'block' : 'none';
+      }, 150);
+  }
+  setTimeout(() => {
+    if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
+        window.aplicarVisibilidadeGamificacao();
+    }
+}, 200);
 }
 
 function initEmployeePanel() {
@@ -784,32 +811,136 @@ window.atualizarPainelGamificacao = function() {
 };
 
 function renderizarBarraGamificacao() {
-    let xp = currentUser.xp || 0;
-    let coins = currentUser.goCoins || 0;
-    let level = currentUser.level || 1;
+  let xp = currentUser.xp || 0;
+  let coins = currentUser.goCoins || 0;
+  let level = currentUser.level || 1;
 
-    let titulos = {
-        1: 'Iniciante', 2: 'Focado', 3: 'Produtivo', 4: 'Especialista', 5: 'Mestre das Entregas'
-    };
-    let tituloAtual = titulos[level] || 'Lenda da Empresa 👑';
+  // Vai buscar a regra da empresa (ou usa 500 por padrão)
+  const c = companies.find(x => x.id === currentUser.companyId);
+  let xpNecessarioPorNivel = 500;
+  if (c && c.gamificacao && c.gamificacao.xpNivel) {
+      xpNecessarioPorNivel = c.gamificacao.xpNivel;
+  }
 
-    // Matemática da barra
-    let xpAtualNoNivel = xp % 500; 
-    let porcentagem = (xpAtualNoNivel / 500) * 100;
+  let titulos = { 1: 'Iniciante', 2: 'Focado', 3: 'Produtivo', 4: 'Especialista', 5: 'Mestre das Entregas' };
+  let tituloAtual = titulos[level] || 'Lenda da Empresa 👑';
 
-    const levelDisplay = document.getElementById('userLevelDisplay');
-    if (levelDisplay) {
-        levelDisplay.innerText = level;
-        document.getElementById('userTitleDisplay').innerText = tituloAtual;
-        document.getElementById('currentXpDisplay').innerText = xpAtualNoNivel;
-        document.getElementById('xpProgressBar').style.width = porcentagem + '%';
-        
-        // Efeito de piscar nas moedas
-        const coinDisplay = document.getElementById('goCoinsDisplay');
-        if (coinDisplay.innerText !== coins.toString()) {
-            coinDisplay.innerText = coins;
-            coinDisplay.parentElement.style.transform = 'scale(1.2)';
-            setTimeout(() => { coinDisplay.parentElement.style.transform = 'scale(1)'; }, 300);
-        }
-    }
+  // Matemática da barra dinâmica
+  let xpAtualNoNivel = xp % xpNecessarioPorNivel; 
+  let porcentagem = (xpAtualNoNivel / xpNecessarioPorNivel) * 100;
+
+  const levelDisplay = document.getElementById('userLevelDisplay');
+  if (levelDisplay) {
+      levelDisplay.innerText = level;
+      document.getElementById('userTitleDisplay').innerText = tituloAtual;
+      document.getElementById('currentXpDisplay').innerText = xpAtualNoNivel;
+      
+      // Atualiza o texto na tela para mostrar o alvo correto (Ex: 0 / 1000 XP)
+      const nextLevelDisplay = document.getElementById('nextLevelXpDisplay');
+      if(nextLevelDisplay) nextLevelDisplay.innerText = xpNecessarioPorNivel;
+
+      document.getElementById('xpProgressBar').style.width = Math.min(porcentagem, 100) + '%';
+      document.getElementById('goCoinsDisplay').innerText = coins;
+  }
 }
+
+// =======================================================
+// VITRINE DA LOJA (VISÃO DO FUNCIONÁRIO)
+// =======================================================
+
+window.setupFuncStore = function() {
+  // Atualiza o banner de saldo
+  const saldoDisplay = document.getElementById('storeUserCoinsDisplay');
+  if (saldoDisplay) saldoDisplay.innerText = currentUser.goCoins || 0;
+
+  loadFuncRewards();
+};
+
+window.loadFuncRewards = function() {
+  const container = document.getElementById('funcRewardsCatalog');
+  if (!container) return;
+
+  // Busca apenas os prêmios da empresa dele que estão ATIVOS
+  db.collection('premios').where('companyId', '==', currentUser.companyId).where('ativo', '==', true).get().then(snap => {
+      if (snap.empty) {
+          container.innerHTML = '<div class="card" style="grid-column: 1 / -1; text-align:center; padding:30px; opacity:0.6;">A loja está vazia no momento. Em breve teremos novidades!</div>';
+          return;
+      }
+
+      let premios = [];
+      snap.forEach(doc => premios.push(doc.data()));
+      premios.sort((a, b) => a.preco - b.preco); // Exibe do mais barato para o mais caro
+
+      let html = '';
+      const saldoAtual = currentUser.goCoins || 0;
+
+      premios.forEach(p => {
+          // Se ele não tiver dinheiro, o botão fica cinza e desativado
+          const podeComprar = saldoAtual >= p.preco;
+          const btnHtml = podeComprar 
+              ? `<button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="solicitarResgate(${p.id}, '${p.nome}', ${p.preco})"><i class="fa-solid fa-cart-shopping"></i> Resgatar</button>`
+              : `<button class="btn" style="width: 100%; margin-top: 15px; background: var(--color-border); color: var(--color-text-secondary); cursor: not-allowed;" disabled><i class="fa-solid fa-lock"></i> Saldo Insuficiente</button>`;
+
+          html += `
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 20px; text-align: center; border-top: 4px solid var(--color-primary); box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              <div>
+                  <div style="width: 50px; height: 50px; background: rgba(16, 185, 129, 0.1); color: var(--color-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; margin: 0 auto 15px auto;">
+                      <i class="fa-solid fa-gift"></i>
+                  </div>
+                  <h3 style="font-size: 16px; margin-bottom: 8px;">${p.nome}</h3>
+                  <p style="font-size: 12px; color: var(--color-text-secondary); line-height: 1.4; margin-bottom: 15px;">${p.descricao}</p>
+              </div>
+              <div>
+                  <span style="display: block; font-size: 18px; font-weight: 900; color: #b45309; background: #fef3c7; padding: 8px; border-radius: 8px;">
+                      <i class="fa-solid fa-coins"></i> ${p.preco}
+                  </span>
+                  ${btnHtml}
+              </div>
+          </div>`;
+      });
+
+      container.innerHTML = html;
+  });
+};
+
+window.solicitarResgate = function(premioId, premioNome, preco) {
+  if (confirm(`Deseja realmente gastar ${preco} GoCoins para resgatar: ${premioNome}?`)) {
+      
+      // Bloqueio duplo de segurança
+      if (currentUser.goCoins < preco) {
+          return showToast('Você não tem moedas suficientes!', 'error');
+      }
+
+      const btnOriginal = document.activeElement;
+      btnOriginal.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+      btnOriginal.disabled = true;
+
+      const novoResgate = {
+          id: Date.now(),
+          companyId: currentUser.companyId,
+          userId: currentUser.id,
+          premioId: premioId,
+          premioNome: premioNome,
+          preco: preco,
+          status: 'pendente', // Vai para o chefe aprovar
+          createdAt: new Date().toISOString()
+      };
+
+      // 1. Cria o pedido no banco
+      const p1 = db.collection('resgates').doc(novoResgate.id.toString()).set(novoResgate);
+      
+      // 2. DESCONTA AS MOEDAS DO FUNCIONÁRIO IMEDIATAMENTE!
+      const novoSaldo = currentUser.goCoins - preco;
+      const p2 = db.collection('usuarios').doc(currentUser.id.toString()).update({ goCoins: novoSaldo });
+
+      Promise.all([p1, p2]).then(() => {
+          currentUser.goCoins = novoSaldo; // Atualiza na memória local
+          showToast('🎉 Pedido realizado com sucesso! Aguarde a entrega do Administrador.');
+          setupFuncStore(); // Recarrega a tela para atualizar o saldo e os botões
+      }).catch(err => {
+          showToast('Erro ao processar resgate.', 'error');
+          btnOriginal.innerHTML = '<i class="fa-solid fa-cart-shopping"></i> Resgatar';
+          btnOriginal.disabled = false;
+      });
+  }
+};

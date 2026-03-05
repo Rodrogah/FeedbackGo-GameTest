@@ -1037,6 +1037,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // =======================================================
 // RANKING MENSAL (CÁLCULO E EXIBIÇÃO)
 // =======================================================
+
 window.renderRankingMensal = function(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -1045,20 +1046,17 @@ window.renderRankingMensal = function(containerId) {
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
 
-  // 1. Filtra atividades do mês atual da empresa que deram XP
   const atividadesMes = activities.filter(a => {
       if (a.companyId !== currentUser.companyId || !a.xpEarned || !a.date) return false;
       const dataAtiv = new Date(a.date);
       return dataAtiv.getMonth() === mesAtual && dataAtiv.getFullYear() === anoAtual;
   });
 
-  // 2. Soma o XP por usuário
   const xpPorUsuario = {};
   atividadesMes.forEach(a => {
       xpPorUsuario[a.userId] = (xpPorUsuario[a.userId] || 0) + a.xpEarned;
   });
 
-  // 3. Monta o Array de Ranking
   let ranking = Object.keys(xpPorUsuario).map(userId => {
       const u = users.find(x => x.id == userId);
       return {
@@ -1073,7 +1071,17 @@ window.renderRankingMensal = function(containerId) {
       return;
   }
 
-  const premios = [500, 400, 300, 200, 100];
+  // 🚀 LÊ AS MOEDAS DIRETAMENTE DAS CONFIGURAÇÕES DA EMPRESA!
+  const c = companies.find(x => x.id === currentUser.companyId);
+  const regras = (c && c.gamificacao) ? c.gamificacao : {};
+  const premios = [
+      regras.premioTop1 || 500, 
+      regras.premioTop2 || 400, 
+      regras.premioTop3 || 300, 
+      regras.premioTop4 || 200, 
+      regras.premioTop5 || 100
+  ];
+  
   const cores = ['#fbbf24', '#94a3b8', '#b45309', '#3b82f6', '#10b981'];
 
   let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
@@ -1093,3 +1101,57 @@ window.renderRankingMensal = function(containerId) {
   html += '</div>';
   container.innerHTML = html;
 };
+
+// =======================================================
+// CONTROLE DE VISIBILIDADE DA GAMIFICAÇÃO
+// =======================================================
+window.aplicarVisibilidadeGamificacao = function() {
+  if (!currentUser) return;
+  const c = companies.find(x => x.id === currentUser.companyId);
+  
+  // 🚀 LÊ A VARIÁVEL CORRETA AGORA (Que ligamos no admin.js)
+  const gamiAtiva = c && c.gamificationEnabled === true;
+
+  // 1. Esconde/Mostra os menus da Loja (tanto no Admin quanto no Func)
+  document.querySelectorAll('.nav-item[onclick*="store"]').forEach(el => {
+      el.style.display = gamiAtiva ? 'flex' : 'none';
+  });
+
+  // 2. Esconde/Mostra a Barra de XP e Rankings (Novos IDs)
+  const barraXp = document.getElementById('xpProgressBar');
+  if (barraXp) {
+      const cartaoXp = barraXp.closest('.card');
+      if (cartaoXp) cartaoXp.style.display = gamiAtiva ? 'flex' : 'none';
+  }
+
+  const rankings = ['rankingFuncContainer', 'rankingAdminContainer'];
+  rankings.forEach(id => {
+      const container = document.getElementById(id);
+      if (container) {
+          const cartaoRanking = container.closest('.card');
+          if (cartaoRanking) cartaoRanking.style.display = gamiAtiva ? 'block' : 'none';
+      }
+  });
+
+  // 3. Esconde/Mostra os cartões antigos (Caso ainda existam no HTML)
+  const cardStatusFunc = document.getElementById('cardStatusFuncionario');
+  if (cardStatusFunc) cardStatusFunc.style.display = gamiAtiva ? 'flex' : 'none';
+
+  const cardRankFunc = document.getElementById('cardRankingFuncionario');
+  if (cardRankFunc) cardRankFunc.style.display = gamiAtiva ? 'block' : 'none';
+
+  const cardRankAdmin = document.getElementById('cardRankingAdmin');
+  if (cardRankAdmin && cardRankAdmin.parentNode) {
+      cardRankAdmin.parentNode.style.display = gamiAtiva ? 'block' : 'none';
+  }
+
+  // 4. 🚀 NOVO: Esconde a caixa de Dificuldade na tela de Delegar Tarefas!
+  const boxDif = document.getElementById('boxDificuldadeGamificacao');
+  if (boxDif) boxDif.style.display = gamiAtiva ? 'block' : 'none';
+};
+
+// Adiciona um gatilho para rodar sempre que uma tela carregar
+const observerTelas = new MutationObserver(() => aplicarVisibilidadeGamificacao());
+document.addEventListener("DOMContentLoaded", () => {
+  observerTelas.observe(document.body, { childList: true, subtree: true });
+});
