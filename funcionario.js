@@ -90,6 +90,11 @@ async function showEmployeeSection(sec) {
       if (profileInput) profileInput.value = currentUser.name;
       setupFuncSettingsForms();
 
+      // 🔥 O GATILHO QUE FALTAVA: Manda desenhar o avatar assim que a página abre!
+      if (typeof window.carregarPerfilEAvatarFunc === 'function') {
+          setTimeout(window.carregarPerfilEAvatarFunc, 150);
+      }
+
     } else if (sec === 'tarefas-recebidas') {
       setupFuncionarioTarefas();
     } else if (sec === 'store') {
@@ -127,16 +132,22 @@ async function showEmployeeSection(sec) {
 function initEmployeePanel() {
   const c = companies.find((x) => x.id === currentUser.companyId);
   if (!c) return;
+  
   document.getElementById('empCompanySidebar').textContent = c.name;
-  document.getElementById('sidebarEmployeeName').textContent =
-    currentUser.name.split(' ')[0];
-  document.getElementById('employeeAvatar').textContent = currentUser.name
-    .charAt(0)
-    .toUpperCase();
-  document.getElementById('employeeTeamName').textContent =
-    currentUser.team || 'Membro';
-  showEmployeeSection('dashboard');
+  document.getElementById('sidebarEmployeeName').textContent = currentUser.name.split(' ')[0];
+  document.getElementById('employeeTeamName').textContent = currentUser.team || 'Membro';
 
+  // 🔥 O FIX DO F5 (Agora procura a foto e injeta no ID correto: employeeAvatar)
+  const sideAvatar = document.getElementById('employeeAvatar');
+  if (sideAvatar) {
+      if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
+          sideAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+      } else {
+          sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+      }
+  }
+
+  showEmployeeSection('dashboard');
   setTimeout(runAutoCleanup, 5000);
 }
 
@@ -947,4 +958,131 @@ window.solicitarResgate = function(premioId, premioNome, preco) {
           btnOriginal.disabled = false;
       });
   }
+};
+
+// =======================================================
+// ESTÚDIO DE AVATARES FUNCIONÁRIO - LORELEI EXCLUSIVO
+// =======================================================
+
+const genVarFunc = (count) => Array.from({length: count}, (_, i) => `variant${String(i+1).padStart(2, '0')}`);
+
+const loreleiConfigFunc = {
+    f1: { prop: 'hair', values: genVarFunc(47) }, // Cabelos
+    f2: { prop: 'eyes', values: genVarFunc(24) }, // Olhos
+    f3: { prop: 'mouth', values: genVarFunc(20) }, // Bocas seguras (até a variant21)
+    f4: { prop: 'glasses', values: ['none', ...genVarFunc(5)] } // Óculos
+};
+
+window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
+
+window.mudarTracoStudio = function(traco, direcao) {
+    const opcoes = loreleiConfigFunc[traco].values;
+    window.charState[traco] += direcao;
+    
+    if (window.charState[traco] > opcoes.length - 1) window.charState[traco] = 0;
+    if (window.charState[traco] < 0) window.charState[traco] = opcoes.length - 1;
+    
+    window.renderStudio();
+};
+
+window.renderStudio = function() {
+    ['f1', 'f2', 'f3', 'f4'].forEach(t => {
+        const lbl = document.getElementById(`lbl_${t}`);
+        if (lbl) lbl.innerText = window.charState[t];
+    });
+
+    const getCor = (id) => document.getElementById(id).value.replace('#', '');
+    const url = `https://api.dicebear.com/9.x/lorelei/svg?seed=Func&backgroundColor=${getCor('studioBgColor')}&skinColor=${getCor('studioSkinColor')}&hairColor=${getCor('studioHairColor')}&hair=${loreleiConfigFunc.f1.values[window.charState.f1]}&eyes=${loreleiConfigFunc.f2.values[window.charState.f2]}&mouth=${loreleiConfigFunc.f3.values[window.charState.f3]}&glasses=${loreleiConfigFunc.f4.values[window.charState.f4]}&glassesProbability=${window.charState.f4 === 0 ? 0 : 100}`;
+
+    const imgEl = document.getElementById('avatarStudioImg');
+    if (imgEl) { imgEl.src = url; imgEl.style.display = 'block'; }
+    document.getElementById('avatarStudioLetra').style.display = 'none';
+};
+
+window.carregarPerfilEAvatarFunc = function() {
+    if (!currentUser) return;
+    document.getElementById('funcProfileName').value = currentUser.name;
+
+    if (currentUser.avatarUrl && currentUser.avatarUrl.includes('lorelei')) {
+        try {
+            const urlObj = new URL(currentUser.avatarUrl);
+            const p = (param, slot) => {
+                const v = urlObj.searchParams.get(param);
+                const idx = loreleiConfigFunc[slot].values.indexOf(v);
+                return idx !== -1 ? idx : 0;
+            };
+            window.charState = { f1: p('hair', 'f1'), f2: p('eyes', 'f2'), f3: p('mouth', 'f3'), f4: p('glasses', 'f4') };
+            
+            const c = (param, id) => {
+                let v = urlObj.searchParams.get(param);
+                if (v) {
+                    v = v.replace('#', '');
+                    document.getElementById(id).value = '#' + v;
+                }
+            };
+            c('backgroundColor', 'studioBgColor'); c('skinColor', 'studioSkinColor'); c('hairColor', 'studioHairColor');
+        } catch(e) {}
+    } else {
+        // Cores Padrão se for novo
+        if(document.getElementById('studioBgColor')) document.getElementById('studioBgColor').value = '#b6e3f4';
+        if(document.getElementById('studioSkinColor')) document.getElementById('studioSkinColor').value = '#ffdbb4';
+        if(document.getElementById('studioHairColor')) document.getElementById('studioHairColor').value = '#2a2a2a';
+    }
+    
+    window.renderStudio();
+};
+
+document.addEventListener('click', (e) => {
+  if(e.target.closest('[onclick*="tabFuncPerfil"]')) {
+      setTimeout(window.carregarPerfilEAvatarFunc, 50);
+  }
+});
+
+window.salvarPerfilStudioFuncionario = function(btn) {
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+  btn.disabled = true;
+  
+  const novoNome = document.getElementById('funcProfileName').value.trim();
+  const novaSenha = document.getElementById('funcProfilePassword').value.trim();
+  
+  const imgEl = document.getElementById('avatarStudioImg');
+  let novoAvatar = '';
+  if (imgEl && imgEl.src && imgEl.src.includes('dicebear.com')) {
+      novoAvatar = imgEl.src;
+  }
+
+  if (!novoNome) { 
+      showToast('O nome não pode estar vazio!', 'error'); 
+      btn.innerHTML = original; btn.disabled = false; return; 
+  }
+
+  const updates = { name: novoNome };
+  if (novaSenha) updates.password = novaSenha;
+  if (novoAvatar) updates.avatarUrl = novoAvatar;
+
+  db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
+      currentUser.name = novoNome;
+      if (novaSenha) currentUser.password = novaSenha;
+      if (novoAvatar) currentUser.avatarUrl = novoAvatar;
+
+      const uIndex = users.findIndex(x => x.id === currentUser.id);
+      if (uIndex !== -1) { users[uIndex].name = novoNome; users[uIndex].avatarUrl = novoAvatar; }
+
+      // 🔥 CORREÇÃO DE IDs: Apontar exatamente para os nomes que existem no HTML do funcionário
+      const sideAvatar = document.getElementById('employeeAvatar');
+      if (sideAvatar) sideAvatar.innerHTML = `<img src="${novoAvatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+      
+      const sideName = document.getElementById('sidebarEmployeeName');
+      if (sideName) sideName.textContent = novoNome.split(' ')[0];
+
+      showToast('Perfil e Avatar guardados!');
+      document.getElementById('funcProfilePassword').value = '';
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+      setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+  }).catch(err => {
+      console.error(err);
+      showToast('Erro ao salvar.', 'error');
+      btn.innerHTML = original; btn.disabled = false;
+  });
 };

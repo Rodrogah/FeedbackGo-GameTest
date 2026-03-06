@@ -3,15 +3,20 @@ function initAdminPanel() {
   const c = companies.find((x) => x.id === currentUser.companyId);
   if (!c) return;
   document.getElementById('admCompanySidebar').textContent = c.name;
-  document.getElementById('sidebarAdminName').textContent =
-    currentUser.name.split(' ')[0];
-  document.getElementById('adminAvatar').textContent = currentUser.name
-    .charAt(0)
-    .toUpperCase();
+  document.getElementById('sidebarAdminName').textContent = currentUser.name.split(' ')[0];
+  
+  // 🔥 FIX DO F5: Carrega a foto guardada no menu lateral imediatamente
+  const sideAvatar = document.getElementById('adminAvatar');
+  if (sideAvatar) {
+      if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
+          sideAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+      } else {
+          sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+      }
+  }
+
   updateCurrentDate('adminCurrentDate');
-
   showAdminSection('dashboard');
-
   setTimeout(runAutoCleanup, 5000);
 }
 
@@ -877,7 +882,7 @@ function setupAdminSettingsForms() {
   }
 }
 
-// ============ NAVEGAÇÃO DE CONFIGURAÇÕES COM ROLAGEM AUTOMÁTICA ============
+// ============ NAVEGAÇÃO DE CONFIGURAÇÕES (CORRIGIDA) ============
 window.openSettingsTab = function (tabId, btnElement) {
   document.querySelectorAll('.settings-tab-content').forEach((tab) => {
       tab.style.display = 'none';
@@ -889,36 +894,16 @@ window.openSettingsTab = function (tabId, btnElement) {
   }
 
   const activeTab = document.getElementById(tabId);
-  activeTab.style.display = 'block';
-  btnElement.classList.add('active');
+  if (activeTab) activeTab.style.display = 'block';
+  if (btnElement) btnElement.classList.add('active');
 
-  // 🚀 FORÇA A ROLAGEM PARA O TOPO SEMPRE QUE ABRIR UMA ABA
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  if (window.innerWidth <= 768) {
-      navContainer.classList.add('mobile-hidden');
-      const contentArea = activeTab.closest('.settings-content-area');
-      contentArea.classList.add('mobile-active');
-
-      if (!activeTab.querySelector('.btn-mobile-back')) {
-          const backBtn = document.createElement('button');
-          backBtn.className = 'btn-mobile-back';
-          backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Voltar';
-          
-          backBtn.onclick = function() {
-              contentArea.classList.remove('mobile-active');
-              navContainer.classList.remove('mobile-hidden');
-              activeTab.style.display = 'none';
-              btnElement.classList.remove('active');
-              // 🚀 FORÇA A ROLAGEM PARA O TOPO AO VOLTAR PARA O MENU
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-          };
-          
-          activeTab.insertBefore(backBtn, activeTab.firstChild);
-      }
+  // 🔥 GATILHO: Garante que o avatar carrega assim que clica na aba
+  if (tabId === 'tabPerfil' && typeof window.carregarPerfilEAvatar === 'function') {
+      setTimeout(window.carregarPerfilEAvatar, 50); 
   }
-};
 
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 window.generateReport = function () {
   document.getElementById('periodReport').innerHTML = generateActivityTableHTML(
     getFilteredReportData(),
@@ -1940,4 +1925,180 @@ window.salvarRegrasGamificacao = function(btnElement) {
 
       setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
   });
+};
+
+// =======================================================
+// ESTÚDIO DE AVATARES - LORELEI EXCLUSIVO (FIX SALVAMENTO E F5)
+// =======================================================
+
+// As dezenas de opções calibradas
+const genVar = (count) => Array.from({length: count}, (_, i) => `variant${String(i+1).padStart(2, '0')}`);
+
+const loreleiConfig = {
+    f1: { prop: 'hair', values: genVar(48) },
+    f2: { prop: 'eyes', values: genVar(24) },
+    f3: { prop: 'mouth', values: ['happy01','happy02','happy03','happy04','happy05','happy06','happy07','happy08','happy09','happy10','happy11','happy12','happy13','happy14','happy15','sad01','sad02','sad03','sad04','sad05','sad06'] },
+    f4: { prop: 'glasses', values: ['none', ...genVar(5)] }
+};
+
+window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
+window.charSessionActive = false;
+
+window.mudarTracoStudio = function(traco, direcao) {
+    const opcoes = loreleiConfig[traco].values;
+    window.charState[traco] += direcao;
+    const max = opcoes.length - 1;
+    
+    if (window.charState[traco] > max) window.charState[traco] = 0;
+    if (window.charState[traco] < 0) window.charState[traco] = max;
+    
+    window.renderStudio();
+};
+
+window.renderStudio = function() {
+    ['f1', 'f2', 'f3', 'f4'].forEach(t => {
+        const lbl = document.getElementById(`lbl_${t}`);
+        if (lbl) lbl.innerText = window.charState[t];
+    });
+
+    const getCor = (id, fallback) => {
+        const el = document.getElementById(id);
+        return el ? el.value.replace('#', '') : fallback;
+    };
+
+    let url = `https://api.dicebear.com/9.x/lorelei/svg?seed=Admin&backgroundColor=${getCor('studioBgColor', 'b6e3f4')}&skinColor=${getCor('studioSkinColor', 'ffdbb4')}&hairColor=${getCor('studioHairColor', '2a2a2a')}`;
+
+    ['f1', 'f2', 'f3', 'f4'].forEach(f => {
+        const prop = loreleiConfig[f].prop;
+        let val = loreleiConfig[f].values[window.charState[f]];
+        
+        // 🔥 CINTO DE SEGURANÇA: Se a opção não existir, força a primeira! Evita o Erro 400.
+        if (!val) val = loreleiConfig[f].values[0];
+
+        if (val === 'none') {
+            if (prop === 'glasses') url += `&glassesProbability=0`;
+        } else {
+            url += `&${prop}=${val}`;
+            if (prop === 'glasses') url += `&glassesProbability=100`;
+        }
+    });
+
+    const imgEl = document.getElementById('avatarStudioImg');
+    const letraEl = document.getElementById('avatarStudioLetra');
+    
+    if (imgEl) { 
+        imgEl.src = url; 
+        imgEl.style.display = 'block'; 
+        const prevContainer = document.getElementById('avatarStudioPreview');
+        if (prevContainer) prevContainer.style.background = 'transparent';
+    }
+    if (letraEl) letraEl.style.display = 'none';
+};
+
+window.carregarPerfilEAvatar = function() {
+    if (!currentUser) return;
+    
+    const inputNome = document.getElementById('admProfileName');
+    if (inputNome) inputNome.value = currentUser.name;
+
+    if (window.charSessionActive) {
+        window.renderStudio();
+        return;
+    }
+    
+    let isNovoOuCorrompido = true;
+
+    // Carrega do Banco de Dados
+    if (currentUser.avatarUrl && currentUser.avatarUrl.includes('lorelei')) {
+        try {
+            const urlObj = new URL(currentUser.avatarUrl);
+            
+            const pegaIndex = (param, slotName) => {
+                const val = urlObj.searchParams.get(param);
+                if (!val) return 0;
+                const idx = loreleiConfig[slotName].values.indexOf(val);
+                return idx !== -1 ? idx : 0;
+            };
+
+            window.charState.f1 = pegaIndex('hair', 'f1');
+            window.charState.f2 = pegaIndex('eyes', 'f2');
+            window.charState.f3 = pegaIndex('mouth', 'f3');
+            const hasGlasses = urlObj.searchParams.get(`glassesProbability`) !== '0';
+            window.charState.f4 = hasGlasses ? pegaIndex('glasses', 'f4') : 0;
+
+            const pegaCor = (param, id) => {
+                let val = urlObj.searchParams.get(param);
+                const corEl = document.getElementById(id);
+                if (val && corEl) {
+                    val = val.replace('#', ''); // Evita bugar a cor
+                    corEl.value = '#' + val;
+                }
+            };
+            pegaCor('backgroundColor', 'studioBgColor');
+            pegaCor('skinColor', 'studioSkinColor');
+            pegaCor('hairColor', 'studioHairColor');
+            
+            isNovoOuCorrompido = false;
+        } catch(e) { console.warn("Avatar antigo não compatível, limpando..."); }
+    }
+    
+    if (isNovoOuCorrompido) {
+        window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
+        if(document.getElementById('studioBgColor')) document.getElementById('studioBgColor').value = '#b6e3f4';
+        if(document.getElementById('studioSkinColor')) document.getElementById('studioSkinColor').value = '#ffdbb4';
+        if(document.getElementById('studioHairColor')) document.getElementById('studioHairColor').value = '#2a2a2a';
+    }
+
+    window.renderStudio(); 
+    window.charSessionActive = true; 
+};
+
+// Salvar Base de Dados
+window.salvarPerfilStudio = function(btnElement) {
+    const txtOriginal = btnElement.innerHTML;
+    btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+    btnElement.disabled = true;
+
+    const inputNome = document.getElementById('admProfileName');
+    if (!inputNome) { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
+
+    const novoNome = inputNome.value.trim();
+    const novaSenha = document.getElementById('admProfilePassword') ? document.getElementById('admProfilePassword').value.trim() : '';
+    
+    // 🔥 MÁGICA DA CORREÇÃO: Capturamos a URL diretamente da imagem visível na tela!
+    const imgEl = document.getElementById('avatarStudioImg');
+    let novoAvatar = '';
+    if (imgEl && imgEl.src && imgEl.src.includes('dicebear.com')) {
+        novoAvatar = imgEl.src;
+    }
+
+    if (!novoNome) { showToast('O nome não pode ficar vazio!', 'error'); btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
+
+    const updates = { name: novoNome };
+    if (novaSenha) updates.password = novaSenha;
+    if (novoAvatar) updates.avatarUrl = novoAvatar;
+
+    db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
+        currentUser.name = novoNome;
+        if (novaSenha) currentUser.password = novaSenha;
+        if (novoAvatar) currentUser.avatarUrl = novoAvatar;
+
+        const uIndex = users.findIndex(x => x.id === currentUser.id);
+        if (uIndex !== -1) { users[uIndex].name = novoNome; users[uIndex].avatarUrl = novoAvatar; }
+
+        const sideName = document.getElementById('sidebarAdminName');
+        if (sideName) sideName.textContent = novoNome.split(' ')[0];
+        const sideAvatar = document.getElementById('adminAvatar');
+        if (sideAvatar) sideAvatar.innerHTML = novoAvatar ? `<img src="${novoAvatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : novoNome.charAt(0).toUpperCase();
+
+        if (typeof window.renderRankingMensal === 'function') window.renderRankingMensal('rankingAdminContainer');
+
+        showToast('Perfil e Avatar guardados com sucesso!');
+        if (document.getElementById('admProfilePassword')) document.getElementById('admProfilePassword').value = '';
+        btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+        setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
+    }).catch(err => {
+        showToast('Erro ao guardar no sistema.', 'error');
+        btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
+    });
 };

@@ -1076,13 +1076,25 @@ window.renderRankingMensal = function(containerId) {
   });
 
   let ranking = Object.keys(xpPorUsuario).map(userId => {
-      const u = users.find(x => x.id == userId);
-      return {
-          nome: u ? u.name.split(' ')[0] : 'Membro',
-          xp: xpPorUsuario[userId],
-          avatar: u ? u.name.charAt(0).toUpperCase() : '?'
-      };
-  }).sort((a, b) => b.xp - a.xp).slice(0, 5);
+    const u = users.find(x => x.id == userId);
+    
+    // Se tem boneco salvo, mostra a imagem. Se não tem, mostra a Letra!
+    let avatarVisual = '?';
+    if (u) {
+        if (u.avatarUrl) {
+            avatarVisual = `<img src="${u.avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        } else {
+            avatarVisual = u.name.charAt(0).toUpperCase();
+        }
+    }
+
+    return {
+        userId: parseInt(userId),
+        nome: u ? u.name.split(' ')[0] : 'Membro',
+        xp: xpPorUsuario[userId],
+        avatar: avatarVisual
+    };
+}).sort((a, b) => b.xp - a.xp).slice(0, 5);
 
   const c = companies.find(x => x.id === currentUser.companyId);
   const regras = (c && c.gamificacao) ? c.gamificacao : {};

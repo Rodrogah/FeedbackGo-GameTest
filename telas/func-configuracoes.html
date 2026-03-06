@@ -6,92 +6,130 @@
 
   <div class="settings-layout-grid">
     <div class="settings-nav-list">
-      <button
-        type="button"
-        class="nav-list-item active"
-        onclick="openSettingsTab('tabFuncPerfil', this)"
-      >
+      <button type="button" class="nav-list-item active" onclick="openSettingsTab('tabFuncPerfil', this)">
         <i class="fa-solid fa-user"></i> Meu Perfil
       </button>
-      <button
-        type="button"
-        class="nav-list-item"
-        onclick="openSettingsTab('tabFuncAparencia', this)"
-      >
+      <button type="button" class="nav-list-item" onclick="openSettingsTab('tabFuncAparencia', this)">
         <i class="fa-solid fa-display"></i> Aparência
       </button>
     </div>
 
     <div class="settings-content-area">
-      <div
-        id="tabFuncPerfil"
-        class="settings-tab-content"
-        style="display: block"
-      >
+      
+      <div id="tabFuncPerfil" class="settings-tab-content" style="display: block">
         <div class="centered-content-box">
-          <div class="settings-card">
-            <h3><i class="fa-solid fa-lock"></i> Dados de Acesso</h3>
-            <form id="empProfileForm" style="margin-top: 15px">
-              <div class="form-group">
-                <label>Meu Nome</label
-                ><input type="text" id="empProfileName" required />
-              </div>
-              <div class="form-group" style="margin-top: 15px">
-                <label>Nova Palavra-passe</label
-                ><input
-                  type="password"
-                  id="empProfilePassword"
-                  placeholder="Opcional"
-                />
-              </div>
-              <button
-                type="submit"
-                class="btn btn-small"
-                style="margin-top: 15px"
-              >
-                <i class="fa-solid fa-floppy-disk"></i> Atualizar
-              </button>
-              <div
-                id="empProfileAlert"
-                class="hidden"
-                style="margin-top: 10px"
-              ></div>
-            </form>
-          </div>
-        </div>
-      </div>
-      <div id="tabFuncAparencia" class="settings-tab-content">
-        <div class="centered-content-box">
-          <div class="settings-card">
-            <h3><i class="fa-solid fa-display"></i> Aparência do Sistema</h3>
-            <div
-              class="theme-toggle-card"
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 15px;
-                background: #f8fafc;
-                border-radius: 8px;
-                border: 1px solid #e2e8f0;
-                margin-top: 15px;
-              "
-            >
-            <div class="theme-switch-container">
-              <div class="theme-switch-label">
-                  <i class="fa-solid fa-moon" id="themeSwitchIcon"></i> 
-                  <span id="themeSwitchText">Modo Escuro</span>
-              </div>
-              
-              <label class="theme-switch">
-                  <input type="checkbox" id="chkDarkMode" onchange="toggleDarkModeSwitch()">
-                  <span class="theme-slider"></span>
-              </label>
-          </div>
+          <div class="settings-card" style="margin-bottom: 25px; background: var(--color-bg-primary); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid var(--color-border);">
+            
+            <div style="padding: 20px; background: var(--color-primary); color: white; border-radius: 16px 16px 0 0;">
+                <h3 style="margin: 0; color: white;"><i class="fa-solid fa-user-astronaut"></i> Estúdio de Avatar</h3>
+                <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Crie a sua identidade visual para o pódio e notificações.</p>
+            </div>
+
+            <div style="display: flex; gap: 30px; align-items: flex-start; margin: 0; padding: 25px; background: var(--color-bg-secondary); flex-wrap: wrap; justify-content: center;">
+                
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                    <div id="avatarStudioPreview" style="width: 180px; height: 180px; border-radius: 20px; border: 5px solid var(--color-bg-primary); background: var(--color-bg-primary); box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 60px; font-weight: 900; overflow: hidden; color: var(--color-text-secondary); position: relative; transition: all 0.3s ease;">
+                        <img id="avatarStudioImg" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;" onerror="this.style.display='none'; document.getElementById('avatarStudioLetra').style.display='block';">
+                        <span id="avatarStudioLetra"><i class="fa-solid fa-spinner fa-spin"></i></span>
+                    </div>
+                    <div style="background: var(--color-bg-primary); border-radius: 8px; padding: 8px 15px; font-weight: bold; color: var(--color-primary); border: 1px solid var(--color-border); width: 180px; text-align: center;">
+                        <i class="fa-solid fa-paintbrush"></i> Estilo: Lorelei
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px; min-width: 280px; flex-grow: 1;">
+                    <div style="background: var(--color-bg-primary); padding: 15px; border-radius: 12px; border: 1px solid var(--color-border);">
+                        <label style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: var(--color-text-secondary); margin-bottom: 12px; display: block; letter-spacing: 1px;"><i class="fa-solid fa-palette"></i> Paleta de Cores</label>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                                <div style="width: 38px; height: 38px; border-radius: 50%; overflow: hidden; border: 3px solid var(--color-bg-secondary); box-shadow: 0 0 0 1px var(--color-border); position: relative;">
+                                    <input type="color" id="studioBgColor" value="#b6e3f4" onchange="window.renderStudio()" style="position: absolute; width: 200%; height: 200%; top: -50%; left: -50%; cursor: pointer; border: none; padding: 0;">
+                                </div>
+                                <span style="font-size: 10px; font-weight: 800; color: var(--color-text-secondary); text-transform: uppercase;">Fundo</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                                <div style="width: 38px; height: 38px; border-radius: 50%; overflow: hidden; border: 3px solid var(--color-bg-secondary); box-shadow: 0 0 0 1px var(--color-border); position: relative;">
+                                    <input type="color" id="studioSkinColor" value="#ffdbb4" onchange="window.renderStudio()" style="position: absolute; width: 200%; height: 200%; top: -50%; left: -50%; cursor: pointer; border: none; padding: 0;">
+                                </div>
+                                <span style="font-size: 10px; font-weight: 800; color: var(--color-text-secondary); text-transform: uppercase;">Pele</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                                <div style="width: 38px; height: 38px; border-radius: 50%; overflow: hidden; border: 3px solid var(--color-bg-secondary); box-shadow: 0 0 0 1px var(--color-border); position: relative;">
+                                    <input type="color" id="studioHairColor" value="#2a2a2a" onchange="window.renderStudio()" style="position: absolute; width: 200%; height: 200%; top: -50%; left: -50%; cursor: pointer; border: none; padding: 0;">
+                                </div>
+                                <span style="font-size: 10px; font-weight: 800; color: var(--color-text-secondary); text-transform: uppercase;">Cabelo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--color-bg-primary); padding: 15px; border-radius: 12px; border: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: var(--color-text-secondary); margin-bottom: 5px; display: block; letter-spacing: 1px;"><i class="fa-solid fa-shapes"></i> Personalizar Feições</label>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-secondary); padding: 8px 12px; border-radius: 8px;">
+                            <span style="font-size: 13px; font-weight: bold; color: var(--color-text-primary);"><i class="fa-solid fa-scissors"></i> Cabelo</span>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <button type="button" onclick="window.mudarTracoStudio('f1', -1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span id="lbl_f1" style="width: 20px; text-align:center; font-weight:900; color:var(--color-text-primary);">0</span>
+                                <button type="button" onclick="window.mudarTracoStudio('f1', 1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-secondary); padding: 8px 12px; border-radius: 8px;">
+                            <span style="font-size: 13px; font-weight: bold; color: var(--color-text-primary);"><i class="fa-solid fa-eye"></i> Olhos</span>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <button type="button" onclick="window.mudarTracoStudio('f2', -1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span id="lbl_f2" style="width: 20px; text-align:center; font-weight:900; color:var(--color-text-primary);">0</span>
+                                <button type="button" onclick="window.mudarTracoStudio('f2', 1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-secondary); padding: 8px 12px; border-radius: 8px;">
+                            <span style="font-size: 13px; font-weight: bold; color: var(--color-text-primary);"><i class="fa-solid fa-lips"></i> Boca</span>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <button type="button" onclick="window.mudarTracoStudio('f3', -1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span id="lbl_f3" style="width: 20px; text-align:center; font-weight:900; color:var(--color-text-primary);">0</span>
+                                <button type="button" onclick="window.mudarTracoStudio('f3', 1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-secondary); padding: 8px 12px; border-radius: 8px;">
+                            <span style="font-size: 13px; font-weight: bold; color: var(--color-text-primary);"><i class="fa-solid fa-glasses"></i> Óculos</span>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <button type="button" onclick="window.mudarTracoStudio('f4', -1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span id="lbl_f4" style="width: 20px; text-align:center; font-weight:900; color:var(--color-text-primary);">0</span>
+                                <button type="button" onclick="window.mudarTracoStudio('f4', 1)" style="background:var(--color-bg-primary); border:1px solid var(--color-border); color:var(--color-text-primary); border-radius:6px; width:28px; height:28px;"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="boxPerfilForm" style="padding: 0 25px 25px 25px;">
+              <div class="form-group"><label>Meu Nome</label><input type="text" id="funcProfileName" required /></div>
+              <div class="form-group" style="margin-top: 15px"><label>Nova Palavra-passe</label><input type="password" id="funcProfilePassword" placeholder="Opcional - Manter atual" /></div>
+              <button type="button" class="btn btn-primary" onclick="salvarPerfilStudioFuncionario(this)" style="margin-top: 25px; width: 100%; font-size: 16px; padding: 12px;"><i class="fa-solid fa-floppy-disk"></i> Guardar Perfil & Avatar</button>
             </div>
           </div>
         </div>
       </div>
+
+      <div id="tabFuncAparencia" class="settings-tab-content" style="display: none;">
+        <div class="centered-content-box">
+          <div class="settings-card">
+            <h3><i class="fa-solid fa-display"></i> Aparência do Sistema</h3>
+            <div class="theme-toggle-card" style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--color-bg-secondary); border-radius: 8px; border: 1px solid var(--color-border); margin-top: 15px;">
+              <div class="theme-switch-container" style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <div class="theme-switch-label">
+                    <i class="fa-solid fa-moon" id="themeSwitchIcon"></i> 
+                    <span id="themeSwitchText" style="margin-left: 8px; font-weight: bold;">Modo Escuro</span>
+                </div>
+                <label class="theme-switch">
+                    <input type="checkbox" id="chkDarkMode" onchange="toggleDarkModeSwitch()">
+                    <span class="theme-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
