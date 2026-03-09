@@ -5,7 +5,6 @@ function initAdminPanel() {
   document.getElementById('admCompanySidebar').textContent = c.name;
   document.getElementById('sidebarAdminName').textContent = currentUser.name.split(' ')[0];
   
-  // 🔥 FIX DO F5: Carrega a foto guardada no menu lateral imediatamente
   const sideAvatar = document.getElementById('adminAvatar');
   if (sideAvatar) {
       if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
@@ -15,10 +14,47 @@ function initAdminPanel() {
       }
   }
 
+  // Injeta o botão de trocar no TOPO do menu lateral
+  if (currentUser.role === 'hibrido') {
+    let btnBox = document.getElementById('boxSwitchToFunc');
+    if (!btnBox) {
+        const nav = document.querySelector('#adminPanel .sidebar-nav');
+        if(nav) {
+            // Mudou de 'beforeend' para 'afterbegin' e o border foi para baixo
+            nav.insertAdjacentHTML('afterbegin', `
+              <div id="boxSwitchToFunc" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #1e293b; padding-left: 12px; padding-right: 12px; padding-top: 5px;">
+                  <button onclick="alternarVisaoHibrida('func')" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 100%; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);">
+                      <i class="fa-solid fa-user-astronaut"></i> Modo Colaborador
+                  </button>
+              </div>
+            `);
+        }
+    }
+}
+
   updateCurrentDate('adminCurrentDate');
   showAdminSection('dashboard');
   setTimeout(runAutoCleanup, 5000);
 }
+
+// 🔥 FUNÇÃO GLOBAL PARA TROCAR DE TELA INSTANTANEAMENTE
+window.alternarVisaoHibrida = function(destino) {
+  const pAdmin = document.getElementById('adminPanel');
+  const pFunc = document.getElementById('employeePanel');
+  
+  // Fecha os menus no mobile para não ficarem presos
+  document.querySelectorAll('.sidebar-nav').forEach(n => n.classList.remove('open'));
+  
+  if (destino === 'func') {
+      if(pAdmin) pAdmin.classList.add('hidden');
+      if(pFunc) pFunc.classList.remove('hidden');
+      if (typeof initEmployeePanel === 'function') initEmployeePanel();
+  } else {
+      if(pFunc) pFunc.classList.add('hidden');
+      if(pAdmin) pAdmin.classList.remove('hidden');
+      if (typeof initAdminPanel === 'function') initAdminPanel();
+  }
+};
 
 async function showAdminSection(sec) {
   const palco = document.getElementById('adminConteudoDinamico');
@@ -532,12 +568,9 @@ window.loadUsersTable = function() {
   const el = document.getElementById('usersTable');
   if (!el) return;
 
-  // Desliga o radar anterior (se houver) para evitar lentidão
   if (window.unsubscribeUsersTable) window.unsubscribeUsersTable();
-
   el.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando colaboradores...</div>';
 
-  // 🚀 O RADAR: Fica escutando o banco de dados AO VIVO
   window.unsubscribeUsersTable = db.collection('usuarios')
       .where('companyId', '==', currentUser.companyId)
       .onSnapshot(snap => {
@@ -554,14 +587,18 @@ window.loadUsersTable = function() {
               <th>Nome</th><th>Equipe</th><th>E-mail</th><th>Ações</th>
           </tr></thead><tbody>${emps.map((u) => {
               
-              // STATUS ONLINE EM TEMPO REAL
               const statusDot = u.isOnline 
                   ? `<span title="Online agora" style="display:inline-block; width:12px; height:12px; background-color:#10b981; border-radius:50%; box-shadow: 0 0 6px #10b981;"></span>` 
                   : `<span title="Offline" style="display:inline-block; width:12px; height:12px; background-color:#64748b; border-radius:50%;"></span>`;
 
+              // 🔥 AS ETIQUETAS DOS CARGOS
+              let badgeRole = '';
+              if (u.role === 'admin') badgeRole = '<span class="badge" style="background:#EDE9FE;color:#7C3AED; margin-left: 5px;">Admin</span>';
+              if (u.role === 'hibrido') badgeRole = '<span class="badge" style="background:#fef08a;color:#a16207; margin-left: 5px;"><i class="fa-solid fa-bolt"></i> Híbrido</span>';
+
               return `<tr>
               <td style="text-align:center;">${statusDot}</td>
-              <td><strong>${u.name}</strong> ${u.role === 'admin' ? '<span class="badge" style="background:#EDE9FE;color:#7C3AED;">Admin</span>' : ''}</td>
+              <td><strong>${u.name}</strong> ${badgeRole}</td>
               <td>${u.team || '-'}</td><td>${u.email}</td>
               <td style="display: flex; gap: 5px;">
                   <button onclick="abrirModalAcessos(${u.id})" class="btn-icon-only" title="Ver Histórico Diário" style="color: var(--color-info); background: rgba(59,130,246,0.1);"><i class="fa-solid fa-list-check"></i></button>

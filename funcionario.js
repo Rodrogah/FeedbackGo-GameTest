@@ -43,15 +43,8 @@ async function showEmployeeSection(sec) {
       updateCurrentDate('currentDate');
 
       const avisoCard = document.getElementById('employeeAnnouncementCard');
-      const avisoTexto = document.getElementById('employeeAnnouncementText');
-      if (avisoCard && avisoTexto && c) {
-        if (c.announcement && c.announcement.trim() !== '') {
-          avisoTexto.textContent = c.announcement;
-          avisoCard.style.display = 'block';
-        } else {
-          avisoCard.style.display = 'none';
-        }
-      }
+      // ... [restante do código do aviso] ...
+      
       renderFuncCharts();
       
       if (typeof window.atualizarPainelGamificacao === 'function') {
@@ -60,6 +53,11 @@ async function showEmployeeSection(sec) {
       
       if (typeof window.renderRankingMensal === 'function') {
           window.renderRankingMensal('rankingFuncContainer');
+      }
+
+      // 🚀 ADICIONE ESTA LINHA AQUI! (Dispara a verificação dos prémios pendentes)
+      if (typeof window.verificarRecompensasPendentes === 'function') {
+          window.verificarRecompensasPendentes();
       }
 
     } else if (sec === 'new-task') {
@@ -137,7 +135,6 @@ function initEmployeePanel() {
   document.getElementById('sidebarEmployeeName').textContent = currentUser.name.split(' ')[0];
   document.getElementById('employeeTeamName').textContent = currentUser.team || 'Membro';
 
-  // 🔥 O FIX DO F5 (Agora procura a foto e injeta no ID correto: employeeAvatar)
   const sideAvatar = document.getElementById('employeeAvatar');
   if (sideAvatar) {
       if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
@@ -146,6 +143,23 @@ function initEmployeePanel() {
           sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
       }
   }
+
+  // Injeta o botão para voltar ao modo Admin
+  if (currentUser.role === 'hibrido') {
+    let btnBox = document.getElementById('boxSwitchToAdmin');
+    if (!btnBox) {
+        const nav = document.querySelector('#employeePanel .sidebar-nav');
+        if(nav) {
+            nav.insertAdjacentHTML('afterbegin', `
+              <div id="boxSwitchToAdmin" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #1e293b; padding-left: 12px; padding-right: 12px; padding-top: 5px;">
+                  <button onclick="alternarVisaoHibrida('admin')" class="btn" style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); width: 100%; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.2);">
+                      <i class="fa-solid fa-crown"></i> Modo Admin
+                  </button>
+              </div>
+            `);
+        }
+    }
+}
 
   showEmployeeSection('dashboard');
   setTimeout(runAutoCleanup, 5000);
@@ -1084,5 +1098,139 @@ window.salvarPerfilStudioFuncionario = function(btn) {
       console.error(err);
       showToast('Erro ao salvar.', 'error');
       btn.innerHTML = original; btn.disabled = false;
+  });
+};
+
+// =======================================================
+// SISTEMA DE RESGATE DE RECOMPENSAS MENSAIS (ISOLADO)
+// =======================================================
+
+// Ferramenta: Verifica se hoje é o último dia do mês
+function isUltimoDiaDoMes(data) {
+  const amanha = new Date(data);
+  amanha.setDate(data.getDate() + 1);
+  return amanha.getDate() === 1;
+}
+
+// NOME ÚNICO: Não entra em conflito com o sistema
+function formatarMesParaResgate(data) {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// NOME ÚNICO: Calcula os pontos apenas para a recompensa, sem apagar o pódio original
+function calcularTop5ParaResgate(companyId, mesString) {
+  const acts = activities.filter(a =>
+      a.companyId === companyId &&
+      a.status === 'concluido' &&
+      a.date && a.date.startsWith(mesString)
+  );
+
+  let mapaPontos = {};
+  acts.forEach(a => {
+      mapaPontos[a.userId] = (mapaPontos[a.userId] || 0) + (a.xpEarned || 0);
+  });
+
+  let ranking = Object.keys(mapaPontos).map(uid => ({
+      userId: parseInt(uid),
+      xp: mapaPontos[uid]
+  })).filter(u => u.xp > 0).sort((a, b) => b.xp - a.xp);
+
+  return ranking;
+}
+
+window.verificarRecompensasPendentes = function() {
+  const c = companies.find(x => x.id === currentUser.companyId);
+  if (!c || !c.gamificationEnabled) return;
+
+  const regras = c.gamificacao || { premioTop1: 500, premioTop2: 400, premioTop3: 300, premioTop4: 200, premioTop5: 100 };
+  const valoresPremios = [regras.premioTop1, regras.premioTop2, regras.premioTop3, regras.premioTop4, regras.premioTop5];
+
+  const hoje = new Date();
+  const mesAtualStr = formatarMesParaResgate(hoje);
+  
+  const mesPassadoData = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  const mesPassadoStr = formatarMesParaResgate(mesPassadoData);
+
+  let mesesParaVerificar = [mesPassadoStr];
+  
+  if (isUltimoDiaDoMes(hoje)) {
+      mesesParaVerificar.push(mesAtualStr);
+  }
+
+  const historicoResgates = currentUser.resgatesRanking || [];
+  let htmlBanner = '';
+
+  for (let mes of mesesParaVerificar) {
+      if (!historicoResgates.includes(mes)) { 
+          const ranking = calcularTop5ParaResgate(c.id, mes);
+          const minhaPosicaoIndex = ranking.findIndex(u => u.userId === currentUser.id);
+
+          if (minhaPosicaoIndex >= 0 && minhaPosicaoIndex < 5) {
+              const premioMoedas = valoresPremios[minhaPosicaoIndex] || 0;
+              
+              const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+              const mesNum = parseInt(mes.split('-')[1]) - 1;
+              const nomeDoMes = nomesMeses[mesNum];
+
+              htmlBanner = `
+              <div id="bannerPremioRanking_${mes}" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 22px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4); animation: transicaoTela 0.5s ease; flex-wrap: wrap; gap: 15px;">
+                  <div style="display: flex; align-items: center; gap: 18px;">
+                      <div style="background: rgba(255,255,255,0.2); width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);">
+                          🏆
+                      </div>
+                      <div>
+                          <h3 style="margin: 0 0 4px 0; font-size: 18px; color: white;">Parabéns! Ficaste no Top ${minhaPosicaoIndex + 1} de ${nomeDoMes}!</h3>
+                          <p style="margin: 0; font-size: 14px; opacity: 0.9;">O teu esforço foi recompensado. Resgata o teu prémio do pódio.</p>
+                      </div>
+                  </div>
+                  <button onclick="resgatarPremioDoRanking('${mes}', ${premioMoedas})" style="background: white; color: #d97706; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: 0.2s; min-width: 160px;">
+                      RESGATAR <i class="fa-solid fa-coins"></i> ${premioMoedas}
+                  </button>
+              </div>
+              `;
+              break; 
+          }
+      }
+  }
+
+  const container = document.getElementById('areaAvisosGamificacao');
+  if (container) {
+      container.innerHTML = htmlBanner;
+  }
+};
+
+window.resgatarPremioDoRanking = function(mesId, valorMoedas) {
+  const btn = event.currentTarget;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Resgatar...';
+  btn.disabled = true;
+
+  const meusResgates = currentUser.resgatesRanking || [];
+  if (!meusResgates.includes(mesId)) {
+      meusResgates.push(mesId);
+  }
+
+  const novoSaldo = (currentUser.goCoins || 0) + valorMoedas;
+
+  db.collection('usuarios').doc(currentUser.id.toString()).update({
+      goCoins: novoSaldo,
+      resgatesRanking: meusResgates
+  }).then(() => {
+      currentUser.goCoins = novoSaldo;
+      currentUser.resgatesRanking = meusResgates;
+      
+      showToast(`🎉 Incrível! +${valorMoedas} GoCoins adicionados ao teu saldo!`);
+      
+      const banner = document.getElementById(`bannerPremioRanking_${mesId}`);
+      if(banner) {
+          banner.style.opacity = '0';
+          banner.style.transform = 'scale(0.9)';
+          setTimeout(() => { banner.style.display = 'none'; }, 300);
+      }
+
+      if (typeof atualizarPainelGamificacao === 'function') atualizarPainelGamificacao();
+  }).catch(err => {
+      showToast('Erro ao resgatar prémio.', 'error');
+      btn.innerHTML = `RESGATAR <i class="fa-solid fa-coins"></i> ${valorMoedas}`;
+      btn.disabled = false;
   });
 };

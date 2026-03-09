@@ -1112,11 +1112,11 @@ window.renderRankingMensal = function(containerId) {
 
   // 🚀 A MÁGICA: Mapeia o array na ordem do seu desenho (4º, 2º, 1º, 3º, 5º)
   const posicoes = [
-      { user: ranking[3], label: '4º', h: '60px', bg: 'linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%)', corTxt: '#1e3a8a', idxCoins: 3 },
-      { user: ranking[1], label: '2º', h: '110px', bg: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%)', corTxt: '#1e293b', idxCoins: 1 },
-      { user: ranking[0], label: '1º', h: '160px', bg: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 100%)', corTxt: '#78350f', crown: true, idxCoins: 0 },
-      { user: ranking[2], label: '3º', h: '85px', bg: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)', corTxt: '#fff', idxCoins: 2 },
-      { user: ranking[4], label: '5º', h: '40px', bg: 'linear-gradient(180deg, #34d399 0%, #10b981 100%)', corTxt: '#064e3b', idxCoins: 4 }
+      { user: ranking[3], label: '4º', h: '90px', bg: 'linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%)', corTxt: '#1e3a8a', idxCoins: 3 },
+      { user: ranking[1], label: '2º', h: '140px', bg: 'linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%)', corTxt: '#1e293b', idxCoins: 1 },
+      { user: ranking[0], label: '1º', h: '170px', bg: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 100%)', corTxt: '#78350f', crown: true, idxCoins: 0 },
+      { user: ranking[2], label: '3º', h: '120px', bg: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)', corTxt: '#fff', idxCoins: 2 },
+      { user: ranking[4], label: '5º', h: '60px', bg: 'linear-gradient(180deg, #34d399 0%, #10b981 100%)', corTxt: '#064e3b', idxCoins: 4 }
   ];
 
   posicoes.forEach((col) => {

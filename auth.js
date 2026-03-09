@@ -175,13 +175,41 @@ function showRecoverScreen() {
   document.getElementById('recoverScreen').classList.remove('hidden');
 }
 
-function showPanel(role) {
-  document.getElementById('loginScreen').classList.add('hidden');
-  if (role === 'admin') {
-    document.getElementById('adminPanel').classList.remove('hidden');
-    initAdminPanel();
+function showPanel(userOrRole) {
+  // 1. Esconde as telas de Login
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.classList.add('hidden');
+  
+  const loginContainer = document.getElementById('login-container');
+  if (loginContainer) loginContainer.style.display = 'none';
+
+  // 2. Acende a luz do App
+  const appInterface = document.getElementById('app-interface');
+  if (appInterface) appInterface.style.display = 'block';
+
+  // 3. Descobre o cargo
+  let role = 'funcionario'; 
+  if (typeof userOrRole === 'string') {
+      role = userOrRole;
+  } else if (userOrRole && userOrRole.role) {
+      role = userOrRole.role;
+  } else if (typeof currentUser !== 'undefined' && currentUser) {
+      role = currentUser.role;
+  }
+
+  const pAdmin = document.getElementById('adminPanel');
+  const pFunc = document.getElementById('employeePanel');
+
+  // 4. Esconde ambos primeiro usando a classe CSS
+  if (pAdmin) pAdmin.classList.add('hidden');
+  if (pFunc) pFunc.classList.add('hidden');
+
+  // 5. Mostra o painel correto removendo a classe (Fura o bloqueio do CSS!)
+  if (role === 'admin' || role === 'hibrido') { 
+    if (pAdmin) pAdmin.classList.remove('hidden');
+    if (typeof initAdminPanel === 'function') initAdminPanel();
   } else {
-    document.getElementById('employeePanel').classList.remove('hidden');
-    initEmployeePanel();
+    if (pFunc) pFunc.classList.remove('hidden');
+    if (typeof initEmployeePanel === 'function') initEmployeePanel();
   }
 }
