@@ -504,17 +504,20 @@ tr:hover {
   font-weight: 600;
 }
 
-.badge-pendente {
-  background: #fef3c7;
-  color: #d97706;
-}
-.badge-andamento {
-  background: #dbeafe;
-  color: #2563eb;
-}
+/* ============ CORES DAS ETIQUETAS DE STATUS (MODO CLARO) ============ */
 .badge-concluido {
-  background: #dcfce7;
-  color: #16a34a;
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+.badge-andamento {
+  background: #fef9c3 !important; /* Fundo Amarelo */
+  color: #ca8a04 !important;      /* Texto Amarelo/Laranja Escuro */
+}
+
+.badge-pendente {
+  background: #fee2e2 !important; /* Fundo Vermelho Claro */
+  color: #dc2626 !important;      /* Texto Vermelho Escuro */
 }
 
 /* ============ FILTROS E ESTADOS VAZIOS ============ */
@@ -958,19 +961,19 @@ body.dark-mode textarea:focus {
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
 }
 
-/* 8. ETIQUETAS (NEON) */
+/* ETIQUETAS NO MODO ESCURO (NEON) */
 body.dark-mode .badge-concluido {
   background-color: rgba(34, 197, 94, 0.15) !important;
   color: #4ade80 !important;
   border-color: rgba(34, 197, 94, 0.3) !important;
 }
 body.dark-mode .badge-andamento {
-  background-color: rgba(234, 179, 8, 0.15) !important;
+  background-color: rgba(234, 179, 8, 0.15) !important; /* Amarelo */
   color: #fde047 !important;
   border-color: rgba(234, 179, 8, 0.3) !important;
 }
 body.dark-mode .badge-pendente {
-  background-color: rgba(239, 68, 68, 0.15) !important;
+  background-color: rgba(239, 68, 68, 0.15) !important; /* Vermelho */
   color: #f87171 !important;
   border-color: rgba(239, 68, 68, 0.3) !important;
 }

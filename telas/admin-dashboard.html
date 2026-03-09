@@ -1,49 +1,49 @@
 <div id="adminDashboard">
-  <div
-    class="page-header"
-    style="
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 15px;
-    "
-  >
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
     <div>
-      <h1><i class="fa-solid fa-gauge"></i> Dashboard</h1>
-      <p id="adminCurrentDate"></p>
+        <h1><i class="fa-solid fa-gauge"></i> Dashboard</h1>
+        <p id="adminCurrentDate"></p>
     </div>
-    <div
-      class="card"
-      style="
-        padding: 6px 16px;
-        margin-bottom: 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      "
-    >
-      <i
-        class="fa-solid fa-filter"
-        style="color: var(--color-text-secondary)"
-      ></i>
-      <select
-        id="dashFilterTeam"
-        onchange="refreshAdminDashboard()"
-        style="
-          border: none;
-          background: transparent;
-          font-weight: 600;
-          outline: none;
-          cursor: pointer;
-          font-size: 14px;
-          box-shadow: none;
-        "
-      >
-        <option value="">Todas as Equipes</option>
-      </select>
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Equipe">
+            <i class="fa-solid fa-users" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterTeam" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todas as Equipes</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Colaborador">
+            <i class="fa-solid fa-user" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterUser" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todos Usuários</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Categoria">
+            <i class="fa-solid fa-tags" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterCategory" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todas Categorias</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Inicial">
+            <i class="fa-solid fa-calendar-day" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="dashFilterStartDate" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Final">
+            <i class="fa-solid fa-calendar-check" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="dashFilterEndDate" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <button onclick="clearAllDashFilters()" title="Limpar Filtros" style="background: transparent; border: 1px dashed var(--color-border); color: var(--color-text-secondary); border-radius: 8px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+          <i class="fa-solid fa-eraser"></i>
+      </button>
+
     </div>
-  </div>
+</div>
 
   <div
     class="stats-grid"

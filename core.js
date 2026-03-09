@@ -250,58 +250,94 @@ function sendFilteredReportEmail(event) {
 
 // ============ 5. ATIVIDADES SHARED (COMPARTILHADAS) ============
 function generateActivityTableHTML(acts, isAdmin = false) {
-  if (!acts.length)
+  if (!acts || !acts.length)
     return `<div class="empty-state"><i class="fa-solid fa-box-open empty-state-icon"></i><p>Nenhum registro encontrado.</p></div>`;
+
   return `<div class="table-container"><table><thead><tr>${
     isAdmin ? '<th>Membro</th>' : ''
   }<th>Data</th><th>Categoria</th><th>Atividade</th><th>Detalhes</th><th>Status</th><th>Ações</th></tr></thead><tbody>
           ${acts
             .map((a) => {
-              const u = users.find((x) => x.id === a.userId);
-              const canEdit = isAdmin || a.userId === currentUser.id;
+              const u = users.find((x) => String(x.id) === String(a.userId));
+              
+              // 1. Comparação segura de IDs (String)
+              const souDono = String(a.userId) === String(currentUser.id);
+              const podeEditar = isAdmin || souDono;
+              const ehDelegada = !!(a.tarefaVinculadaId || a.adminId || a.tipo === 'delegada');
+              const souGestor = (currentUser.role === 'admin' || currentUser.role === 'hibrido');
+
+              // 2. Lógica do Botão de Apagar vs Cadeado
+              const btnApagarOuCadeado = (ehDelegada && !souGestor)
+                ? `<button type="button" class="btn-icon-only" style="opacity: 0.5; cursor: not-allowed;" title="Tarefa Delegada (Bloqueada)"><i class="fa-solid fa-lock"></i></button>`
+                : `<button type="button" onclick="deleteActivity(${a.id})" class="btn-icon-only delete" title="Apagar"><i class="fa-solid fa-trash"></i></button>`;
+
+              // 3. Definição dos botões para evitar erro de variável "a"
+              const btnAnexos = (a.attachments && a.attachments.length > 0) || a.attachmentUrl
+                ? `<button type="button" onclick="openAttachmentModal(${a.id})" class="btn-icon-only" title="Ver Anexos" style="margin-right: 5px; color: var(--color-info);"><i class="fa-solid fa-paperclip"></i></button>`
+                : '';
+              
+              const btnHistorico = `<button type="button" onclick="openHistoryModal(${a.id})" class="btn-icon-only" title="Ver Histórico" style="margin-right: 5px;"><i class="fa-solid fa-clock-rotate-left"></i></button>`;
+              
+              const btnEditar = `<button type="button" onclick="openEditModal(${a.id})" class="btn-icon-only edit" title="Editar" style="margin-right: 5px;"><i class="fa-solid fa-pen"></i></button>`;
+
               return `<tr>${
                 isAdmin
-                  ? `<td class="td-membro"><strong>${
-                      u ? u.name : 'Removido'
-                    }</strong> <span class="td-equipe" style="color: var(--color-text-secondary); font-weight: normal;"> - ${
-                      u ? u.team : ''
-                    }</span></td>`
+                  ? `<td class="td-membro"><strong>${u ? u.name : 'Membro'}</strong></td>`
                   : ''
               }
               <td class="td-data">${formatDate(a.date)}</td>
-              <td class="td-categoria"><span class="badge cat-badge-dynamic" style="${getCategoryStyleString(
-                a.category || 'Geral'
-              )}">${typeof formatCategoryName === 'function' ? formatCategoryName(a.category) : (a.category || 'Geral')}</span></td>
-              <td class="td-titulo"><strong>${
-                a.title
-              }</strong></td><td class="td-detalhes">${
-                a.description ? a.description : '-'
-              }</td>
-              <td class="td-status">${getStatusBadge(a.status)}</td><td class="td-acoes">${
-                canEdit
-                  ? `
-                  ${
-                    (a.attachments && a.attachments.length > 0) ||
-                    a.attachmentUrl
-                      ? `<button type="button" onclick="openAttachmentModal(${a.id})" class="btn-icon-only" title="Ver Anexos" style="margin-right: 5px; color: var(--color-info);"><i class="fa-solid fa-paperclip"></i></button>`
-                      : ''
-                  }
-
-              <button type="button" onclick="openHistoryModal(${
-                a.id
-              })" class="btn-icon-only" title="Ver Histórico" style="margin-right: 5px;"><i class="fa-solid fa-clock-rotate-left"></i></button>
-              <button type="button" onclick="openEditModal(${
-                a.id
-              })" class="btn-icon-only edit" title="Editar"><i class="fa-solid fa-pen"></i></button> 
-              <button type="button" onclick="deleteActivity(${
-                a.id
-              })" class="btn-icon-only delete" title="Apagar"><i class="fa-solid fa-trash"></i></button>`
-                  : '<i class="fa-solid fa-lock" style="color:#CBD5E1;"></i>'
-              }
-          </td></tr>`;
+              <td class="td-categoria">
+                <span class="badge" style="${getCategoryStyleString(a.category || 'Geral')}">
+                    ${typeof formatCategoryName === 'function' ? formatCategoryName(a.category) : (a.category || 'Geral')}
+                </span>
+              </td>
+              <td class="td-titulo"><strong>${a.title || 'Sem título'}</strong></td>
+              <td class="td-detalhes">${a.description || '-'}</td>
+              <td class="td-status">${getStatusBadge(a.status)}</td>
+              <td class="td-acoes">
+                <div style="display: flex; align-items: center;">
+                  ${btnHistorico}
+                  ${podeEditar ? `${btnAnexos}${btnEditar}${btnApagarOuCadeado}` : `<i class="fa-solid fa-lock" style="color:#CBD5E1;" title="Apenas Leitura"></i>`}
+                </div>
+              </td></tr>`;
             })
             .join('')}</tbody></table></div>`;
 }
+
+// Substituir em core.js (Lógica de segurança na deleção)
+window.deleteActivity = function(id) {
+  db.collection('atividades').doc(id.toString()).get().then(docSnap => {
+    if (!docSnap.exists) return;
+    const ativ = docSnap.data();
+
+    const ehDelegada = !!(ativ.tarefaVinculadaId || ativ.adminId || ativ.tipo === 'delegada');
+    const souGestor = (currentUser.role === 'admin' || currentUser.role === 'hibrido');
+
+    if (ehDelegada && !souGestor) {
+        showToast("Esta atividade foi delegada e não pode ser excluída.", "error");
+        return;
+    }
+
+    showConfirm(
+      'Tem certeza que deseja apagar esta atividade permanentemente?',
+      () => {
+        db.collection('atividades').doc(id.toString()).delete().then(() => {
+          if (window.registrarAcao) {
+              window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'EXCLUIR_ATIVIDADE', `Apagou o registro: ${ativ.title || 'Sem título'}`);
+          }
+          if (ativ.tarefaVinculadaId) {
+            db.collection('tarefas').doc(ativ.tarefaVinculadaId.toString()).delete().catch(err => console.error(err));
+          }
+          showToast('Atividade apagada com sucesso!');
+          if (typeof refreshLiveData === 'function') refreshLiveData();
+          if (document.getElementById('employeeHistoryTable') && typeof loadEmployeeHistory === 'function') loadEmployeeHistory();
+          if (document.getElementById('adminActivitiesTable') && typeof loadAllActivities === 'function') loadAllActivities();
+        });
+      },
+      'Apagar Atividade?'
+    );
+  });
+};
 
 document
   .getElementById('editTaskForm')
@@ -351,38 +387,6 @@ document
         });
     }
   });
-
-  window.deleteActivity = function(id) {
-    showConfirm(
-      'Tem certeza que deseja apagar esta atividade permanentemente? Se for uma tarefa delegada, ela também será apagada do sistema.',
-      () => {
-        db.collection('atividades').doc(id.toString()).get().then(docSnap => {
-          if (!docSnap.exists) return;
-          const atividade = docSnap.data();
-          
-          db.collection('atividades').doc(id.toString()).delete().then(() => {
-              
-            // 🚀 ESPIÃO: REGISTRA A EXCLUSÃO
-            if (window.registrarAcao) {
-                window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'EXCLUIR_ATIVIDADE', `Apagou o registro: ${atividade.title || 'Sem título'}`);
-            }
-  
-            if (atividade.tarefaVinculadaId) {
-              db.collection('tarefas').doc(atividade.tarefaVinculadaId).delete().catch(err => console.error(err));
-            }
-  
-            showToast('Atividade apagada com sucesso!');
-            if (typeof refreshLiveData === 'function') refreshLiveData();
-            
-            // Atualiza a tela automaticamente
-            if (document.getElementById('employeeHistoryTable') && typeof loadEmployeeHistory === 'function') loadEmployeeHistory();
-            if (document.getElementById('adminActivitiesTable') && typeof loadAllActivities === 'function') loadAllActivities();
-          });
-        });
-      },
-      'Apagar Atividade?'
-    );
-  };
 
 // ============ 6. MODO ESCURO ============
 function toggleDarkMode() {

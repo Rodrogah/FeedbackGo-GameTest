@@ -38,14 +38,9 @@ async function showEmployeeSection(sec) {
     if (sec === 'dashboard') {
       const greet = document.getElementById('employeeGreeting');
       if (greet) greet.textContent = `Olá, ${currentUser.name.split(' ')[0]}!`;
-      updateEmployeeStats();
-      loadEmployeeRecentTasks();
+      // Apenas atualiza a data e chama o gatilho geral!
       updateCurrentDate('currentDate');
-
-      const avisoCard = document.getElementById('employeeAnnouncementCard');
-      // ... [restante do código do aviso] ...
-      
-      renderFuncCharts();
+      if (typeof window.refreshFuncDashboard === 'function') window.refreshFuncDashboard();
       
       if (typeof window.atualizarPainelGamificacao === 'function') {
           window.atualizarPainelGamificacao();
@@ -165,33 +160,195 @@ function initEmployeePanel() {
   setTimeout(runAutoCleanup, 5000);
 }
 
-function updateEmployeeStats() {
-  const minhasAtividades = activities.filter(
-    (a) => a.userId === currentUser.id
-  );
-  const elHoje = document.getElementById('todayTasksCount');
-  if (elHoje)
-    elHoje.textContent = minhasAtividades.filter(
-      (a) => a.date === getLocalToday()
-    ).length;
-  const elMes = document.getElementById('monthTasks');
-  if (elMes)
-    elMes.textContent = minhasAtividades.filter(
-      (a) => new Date(a.date).getMonth() === new Date().getMonth()
-    ).length;
-  const elTotal = document.getElementById('totalTasks');
-  if (elTotal) elTotal.textContent = minhasAtividades.length;
+// ==========================================
+// MÓDULO POWER BI - FUNCIONÁRIO
+// ==========================================
+window.funcDashActiveStatus = null;
+window.funcDashActiveCategory = null;
+
+// Botão da Borracha
+window.clearFuncDashFilters = function() {
+    const elCat = document.getElementById('funcDashFilterCategory');
+    const elStart = document.getElementById('funcDashFilterStartDate');
+    const elEnd = document.getElementById('funcDashFilterEndDate');
+
+    if(elCat) elCat.value = '';
+    if(elStart) elStart.value = '';
+    if(elEnd) elEnd.value = '';
+    
+    window.funcDashActiveStatus = null;
+    window.funcDashActiveCategory = null;
+    if (typeof refreshFuncDashboard === 'function') refreshFuncDashboard();
+};
+
+// Motor de Filtro Centralizado
+function getFilteredFuncDashboardData(ignoreStatus = false, ignoreCategory = false) {
+    const domCat = document.getElementById('funcDashFilterCategory')?.value;
+    const startDate = document.getElementById('funcDashFilterStartDate')?.value;
+    const endDate = document.getElementById('funcDashFilterEndDate')?.value;
+
+    let f = activities.filter(a => String(a.userId) === String(currentUser.id));
+
+    if (domCat) f = f.filter(a => a.category === domCat);
+    if (startDate) f = f.filter(a => a.date >= startDate);
+    if (endDate) f = f.filter(a => a.date <= endDate);
+    
+    if (!ignoreCategory && window.funcDashActiveCategory) {
+        f = f.filter(a => a.category === window.funcDashActiveCategory);
+    }
+    if (!ignoreStatus && window.funcDashActiveStatus) {
+        f = f.filter(a => a.status === window.funcDashActiveStatus);
+    }
+    return f;
 }
 
-function loadEmployeeRecentTasks() {
+// O gatilho que atualiza tudo de uma vez
+window.refreshFuncDashboard = function() {
+    const c = companies.find((x) => x.id === currentUser.companyId);
+    if (!c) return;
+
+    // Popula a caixa de categoria se estiver vazia
+    const catSelect = document.getElementById('funcDashFilterCategory');
+    if (catSelect && catSelect.options.length <= 1) {
+        catSelect.innerHTML = '<option value="">Todas Categorias</option>' + 
+            (c.categories || defaultCategories).map(cat => `<option value="${cat}">${cat}</option>`).join('');
+    }
+
+    updateEmployeeStats();
+    loadEmployeeRecentTasks();
+    if (typeof window.renderFuncCharts === 'function') window.renderFuncCharts();
+};
+
+// Cards Superiores
+window.updateEmployeeStats = function() {
+  const filtered = getFilteredFuncDashboardData();
+  
+  const elHoje = document.getElementById('todayTasksCount');
+  if (elHoje) elHoje.textContent = filtered.filter((a) => a.date === getLocalToday()).length;
+  
+  const elMes = document.getElementById('monthTasks');
+  if (elMes) {
+      const hoje = new Date();
+      elMes.textContent = filtered.filter((a) => {
+          const d = new Date(a.date);
+          return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+      }).length;
+  }
+  
+  const elTotal = document.getElementById('totalTasks');
+  if (elTotal) elTotal.textContent = filtered.length;
+};
+
+// Tabela de Recentes
+window.loadEmployeeRecentTasks = function() {
   const el = document.getElementById('employeeRecentTasks');
   if (!el) return;
-  const lista = activities
-    .filter((a) => a.userId === currentUser.id)
+  const lista = getFilteredFuncDashboardData()
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5);
   el.innerHTML = generateActivityTableHTML(lista, false);
-}
+};
+
+// Gráficos Interativos
+window.renderFuncCharts = function () {
+    const isDark = document.body.classList.contains('dark-mode');
+    const textColor = isDark ? '#f8fafc' : '#1e293b';
+    const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+    // 1. Gráfico de Pizza (Status)
+    const actsForStatus = getFilteredFuncDashboardData(true, false);
+    const ctxStatus = document.getElementById('funcStatusChart');
+    if (ctxStatus) {
+        let conc = 0, and = 0, pend = 0;
+        actsForStatus.forEach((a) => {
+            if (a.status === 'concluido') conc++;
+            else if (a.status === 'andamento') and++;
+            else if (a.status === 'pendente') pend++;
+        });
+
+        const statusMap = ['concluido', 'andamento', 'pendente'];
+        const activeColors = isDark 
+            ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)'] 
+            : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)'];
+        const inactiveColors = isDark
+            ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)']
+            : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)'];
+
+        const bgStatus = statusMap.map((st, i) => {
+            if (!window.funcDashActiveStatus) return activeColors[i];
+            return window.funcDashActiveStatus === st ? activeColors[i] : inactiveColors[i];
+        });
+
+        if (window.funcStatusChartInstance) window.funcStatusChartInstance.destroy();
+        window.funcStatusChartInstance = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: ['Concluído', 'Em Andamento', 'Pendente'],
+                datasets: [{
+                    data: [conc, and, pend],
+                    backgroundColor: bgStatus,
+                    borderWidth: 2,
+                    borderColor: isDark ? '#1e293b' : '#ffffff',
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const clicked = statusMap[elements[0].index];
+                        window.funcDashActiveStatus = (window.funcDashActiveStatus === clicked) ? null : clicked;
+                        refreshFuncDashboard();
+                    }
+                },
+                plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+            }
+        });
+    }
+
+    // 2. Gráfico de Barras (Categoria)
+    const actsForCategory = getFilteredFuncDashboardData(false, true);
+    const ctxCategory = document.getElementById('funcCategoryChart');
+    if (ctxCategory) {
+        const catCounts = {};
+        actsForCategory.forEach((a) => {
+            const c = a.category || 'Geral';
+            catCounts[c] = (catCounts[c] || 0) + 1;
+        });
+        const labels = Object.keys(catCounts);
+        const data = Object.values(catCounts);
+
+        const bgColors = labels.map((cat) => {
+            const hue = typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
+            const isActive = !window.funcDashActiveCategory || window.funcDashActiveCategory === cat;
+            const alpha = isActive ? (isDark ? '0.85' : '0.9') : '0.2';
+            return `hsla(${hue}, 80%, 50%, ${alpha})`;
+        });
+
+        if (window.funcCategoryChartInstance) window.funcCategoryChartInstance.destroy();
+        window.funcCategoryChartInstance = new Chart(ctxCategory, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Atividades', data: data, backgroundColor: bgColors, borderRadius: 4 }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const clickedCat = labels[elements[0].index];
+                        window.funcDashActiveCategory = (window.funcDashActiveCategory === clickedCat) ? null : clickedCat;
+                        refreshFuncDashboard();
+                    }
+                },
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                    x: { ticks: { color: textColor }, grid: { display: false } },
+                }
+            }
+        });
+    }
+};
 
 // ============ SISTEMA DE PAGINAÇÃO (FUNCIONÁRIO) ============
 let currentEmpPage = 1;
@@ -199,13 +356,20 @@ let currentEmpFilteredActs = [];
 
 function loadEmployeeHistory() {
   currentEmpPage = 1;
-  // Limpa os filtros de data ao abrir a aba
-  const elStart = document.getElementById('empFilterStart');
-  const elEnd = document.getElementById('empFilterEnd');
-  if (elStart) elStart.value = '';
-  if (elEnd) elEnd.value = '';
   
-  applyEmployeeFilters(1);
+  // Limpa os campos de filtro para não dar conflito
+  const fStart = document.getElementById('empFilterStart');
+  const fEnd = document.getElementById('empFilterEnd');
+  const fSearch = document.getElementById('empFilterSearch');
+
+  if (fStart) fStart.value = '';
+  if (fEnd) fEnd.value = '';
+  if (fSearch) fSearch.value = '';
+  
+  // Recarrega os dados (isso vai chamar a generateActivityTableHTML que corrigimos acima)
+  if (typeof window.applyEmployeeFilters === 'function') {
+      window.applyEmployeeFilters(1);
+  }
 }
 
 window.applyEmployeeFilters = function(page = 1) {
@@ -217,7 +381,7 @@ window.applyEmployeeFilters = function(page = 1) {
   const cat = document.getElementById('empFilterCategory') ? document.getElementById('empFilterCategory').value : ''; // Categoria
   const search = document.getElementById('empFilterSearch') ? document.getElementById('empFilterSearch').value.toLowerCase().trim() : ''; // Barra de texto
   
-  let f = activities.filter((a) => a.userId === currentUser.id);
+  let f = activities.filter((a) => String(a.userId) === String(currentUser.id));
 
   // Aplica os filtros um a um
   if (s) f = f.filter((a) => a.date >= s);
@@ -247,20 +411,19 @@ window.renderEmployeeHistoryPage = function() {
   const el = document.getElementById('employeeHistoryTable');
   if (!el) return;
 
-  const itemsPerPage = 20; // 20 Itens por página
+  const itemsPerPage = 20; 
   const totalPages = Math.ceil(currentEmpFilteredActs.length / itemsPerPage) || 1;
   
   if (currentEmpPage > totalPages) currentEmpPage = totalPages;
   if (currentEmpPage < 1) currentEmpPage = 1;
 
-  // Fatiar a lista para pegar apenas os 20 da página atual
   const start = (currentEmpPage - 1) * itemsPerPage;
   const actsPage = currentEmpFilteredActs.slice(start, start + itemsPerPage);
 
-  // Gerar a tabela com a "fatia"
+  // APENAS ESTA LINHA É NECESSÁRIA PARA GERAR A TABELA
+  // O core.js já trata do cadeado e dos botões internamente
   let html = generateActivityTableHTML(actsPage, false);
 
-  // Adicionar controlos de paginação no final da tabela
   if (totalPages > 1) {
       html += `
       <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 25px; padding: 10px;">
@@ -397,110 +560,6 @@ function setupNewTaskForm() {
 
 let funcStatusChartInstance = null;
 let funcCategoryChartInstance = null;
-
-window.renderFuncCharts = function () {
-  const isDark = document.body.classList.contains('dark-mode');
-  const textColor = isDark ? '#f8fafc' : '#1e293b';
-  const gridColor = isDark ? '#334155' : '#e2e8f0';
-  const myActs = activities.filter((a) => a.userId === currentUser.id);
-
-  const ctxStatus = document.getElementById('funcStatusChart');
-  if (ctxStatus) {
-    let conc = 0,
-      and = 0,
-      pend = 0;
-    myActs.forEach((a) => {
-      if (a.status === 'concluido') conc++;
-      else if (a.status === 'andamento') and++;
-      else if (a.status === 'pendente') pend++;
-    });
-    const bgStatus = isDark
-      ? [
-          'rgba(74, 222, 128, 0.85)',
-          'rgba(253, 224, 71, 0.85)',
-          'rgba(248, 113, 113, 0.85)',
-        ]
-      : ['#22c55e', '#eab308', '#ef4444'];
-    const borderStatus = isDark
-      ? ['#22c55e', '#eab308', '#ef4444']
-      : ['#ffffff', '#ffffff', '#ffffff'];
-    if (funcStatusChartInstance) funcStatusChartInstance.destroy();
-    funcStatusChartInstance = new Chart(ctxStatus, {
-      type: 'doughnut',
-      data: {
-        labels: ['Concluído', 'Em Andamento', 'Pendente'],
-        datasets: [
-          {
-            data: [conc, and, pend],
-            backgroundColor: bgStatus,
-            borderWidth: 2,
-            borderColor: borderStatus,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom', labels: { color: textColor } },
-        },
-      },
-    });
-  }
-
-  const ctxCategory = document.getElementById('funcCategoryChart');
-  if (ctxCategory) {
-    const catCounts = {};
-    myActs.forEach((a) => {
-      const c = a.category || 'Geral';
-      catCounts[c] = (catCounts[c] || 0) + 1;
-    });
-    const labels = Object.keys(catCounts);
-    const data = Object.values(catCounts);
-    const bgColors = labels.map((cat) => {
-      const hue =
-        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
-      return isDark
-        ? `hsla(${hue}, 80%, 60%, 0.75)`
-        : `hsla(${hue}, 85%, 45%, 0.75)`;
-    });
-    const borderColors = labels.map((cat) => {
-      const hue =
-        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
-      return isDark ? `hsl(${hue}, 80%, 60%)` : `hsl(${hue}, 85%, 45%)`;
-    });
-    if (funcCategoryChartInstance) funcCategoryChartInstance.destroy();
-    funcCategoryChartInstance = new Chart(ctxCategory, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Nº de Atividades',
-            data: data,
-            backgroundColor: bgColors,
-            borderColor: borderColors,
-            borderWidth: 1,
-            borderRadius: 4,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { color: textColor, stepSize: 1 },
-            grid: { color: gridColor },
-          },
-          x: { ticks: { color: textColor }, grid: { display: false } },
-        },
-      },
-    });
-  }
-};
 
 // =========================================================
 // TAREFAS DELEGADAS E RESPOSTAS (VISÃO DO FUNCIONÁRIO)

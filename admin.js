@@ -211,52 +211,102 @@ window.saveAnnouncement = function () {
     });
 };
 
-function getDashFilteredActivities() {
-  const team = document.getElementById('dashFilterTeam')
-    ? document.getElementById('dashFilterTeam').value
-    : '';
-  let acts = activities.filter((a) => a.companyId === currentUser.companyId);
-  if (team) {
-    const teamUsers = users.filter((u) => u.team === team).map((u) => u.id);
-    acts = acts.filter((a) => teamUsers.includes(a.userId));
-  }
-  return acts;
+// Memória dos cliques nos gráficos
+window.dashActiveStatus = null;
+window.dashActiveCategory = null;
+
+// Função para a Borracha limpar TUDO (Selects + Gráficos)
+window.clearAllDashFilters = function() {
+    document.getElementById('dashFilterTeam').value = '';
+    document.getElementById('dashFilterUser').value = '';
+    document.getElementById('dashFilterCategory').value = '';
+    document.getElementById('dashFilterStartDate').value = '';
+    document.getElementById('dashFilterEndDate').value = '';
+    window.dashActiveStatus = null;
+    window.dashActiveCategory = null;
+    refreshAdminDashboard();
+};
+
+// O Motor atualizado: Agora aceita ignorar uma regra para não "sumir" com o próprio gráfico
+function getFilteredDashboardData(ignoreStatus = false, ignoreCategory = false) {
+    const team = document.getElementById('dashFilterTeam')?.value;
+    const user = document.getElementById('dashFilterUser')?.value;
+    const domCat = document.getElementById('dashFilterCategory')?.value;
+    const startDate = document.getElementById('dashFilterStartDate')?.value;
+    const endDate = document.getElementById('dashFilterEndDate')?.value;
+
+    let f = activities.filter(a => a.companyId === currentUser.companyId);
+
+    if (team) {
+        const teamUsers = users.filter(u => u.team === team).map(u => u.id);
+        f = f.filter(a => teamUsers.includes(a.userId));
+    }
+    if (user) f = f.filter(a => String(a.userId) === String(user));
+    if (domCat) f = f.filter(a => a.category === domCat);
+    if (startDate) f = f.filter(a => a.date >= startDate);
+    if (endDate) f = f.filter(a => a.date <= endDate);
+    
+    // Filtros dos cliques nos gráficos
+    if (!ignoreCategory && window.dashActiveCategory) {
+        f = f.filter(a => a.category === window.dashActiveCategory);
+    }
+    if (!ignoreStatus && window.dashActiveStatus) {
+        f = f.filter(a => a.status === window.dashActiveStatus);
+    }
+    return f;
 }
 
+// Atualizar os cards de números
 function updateAdminStats() {
-  try {
-    const acts = getDashFilteredActivities();
-    const team = document.getElementById('dashFilterTeam')
-      ? document.getElementById('dashFilterTeam').value
-      : '';
-    let filteredUsers = users.filter(
-      (u) => u.companyId === currentUser.companyId && u.active
-    );
-    if (team) filteredUsers = filteredUsers.filter((u) => u.team === team);
+    const filtered = getFilteredDashboardData(); // Pega com TODOS os filtros aplicados
+    
+    const elHoje = document.getElementById('adminTodayTasks');
+    const elMes = document.getElementById('adminMonthTasks');
+    const elTotal = document.getElementById('adminTotalTasks');
 
-    const elUsers = document.getElementById('dashActiveUsers');
-    if (elUsers) elUsers.textContent = filteredUsers.length;
-    const elTotal = document.getElementById('dashTotalActivities');
-    if (elTotal) elTotal.textContent = acts.length;
-    const elConc = document.getElementById('dashCompletedActivities');
-    if (elConc)
-      elConc.textContent = acts.filter((a) => a.status === 'concluido').length;
-    const elPend = document.getElementById('dashPendingActivities');
-    if (elPend)
-      elPend.textContent = acts.filter((a) => a.status === 'pendente').length;
-  } catch (err) {
-    console.error('Erro nas stats:', err);
-  }
+    if (elHoje) elHoje.textContent = filtered.filter(a => a.date === getLocalToday()).length;
+    if (elMes) elMes.textContent = filtered.filter(a => {
+        const d = new Date(a.date);
+        return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+    }).length;
+    if (elTotal) elTotal.textContent = filtered.length;
 }
 
+// Atualizar Tabela Recente
 function loadAdminRecentActivities() {
   const el = document.getElementById('adminRecentActivities');
   if (!el) return;
-  const lista = getDashFilteredActivities()
+  const lista = getFilteredDashboardData() // Usa todos os filtros
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 8);
   el.innerHTML = generateActivityTableHTML(lista, true);
 }
+
+// 2. Função de Refresh à prova de erros
+window.refreshAdminDashboard = function () {
+  const c = companies.find((x) => x.id === currentUser.companyId);
+  if (!c) return;
+
+  // Proteção: Preenche os selects apenas se existirem na tela
+  const userSelect = document.getElementById('dashFilterUser');
+  if (userSelect && userSelect.options.length <= 1) {
+      userSelect.innerHTML = '<option value="">Todos Usuários</option>' + 
+          users.filter(u => u.companyId === currentUser.companyId && u.active)
+               .map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  }
+
+  const catSelect = document.getElementById('dashFilterCategory');
+  if (catSelect && catSelect.options.length <= 1) {
+      catSelect.innerHTML = '<option value="">Todas Categorias</option>' + 
+          (c.categories || defaultCategories).map(cat => `<option value="${cat}">${cat}</option>`).join('');
+  }
+
+  // Atualiza tudo de uma vez
+  updateAdminStats();
+  loadAdminRecentActivities();
+  if (typeof renderAdminCharts === 'function') renderAdminCharts();
+  if (typeof renderRankingMensal === 'function') renderRankingMensal('rankingAdminContainer');
+};
 
 let adminStatusChartInstance = null;
 let adminCategoryChartInstance = null;
@@ -266,155 +316,159 @@ window.renderAdminCharts = function () {
   const isDark = document.body.classList.contains('dark-mode');
   const textColor = isDark ? '#f8fafc' : '#1e293b';
   const gridColor = isDark ? '#334155' : '#e2e8f0';
-  const acts = getDashFilteredActivities();
 
-  const ctxStatus = document.getElementById('adminStatusChart');
-  if (ctxStatus) {
-    let conc = 0,
-      and = 0,
-      pend = 0;
-    acts.forEach((a) => {
-      if (a.status === 'concluido') conc++;
-      else if (a.status === 'andamento') and++;
-      else if (a.status === 'pendente') pend++;
-    });
-    const bgStatus = isDark
-      ? [
-          'rgba(74, 222, 128, 0.85)',
-          'rgba(253, 224, 71, 0.85)',
-          'rgba(248, 113, 113, 0.85)',
-        ]
-      : ['#22c55e', '#eab308', '#ef4444'];
-    const borderStatus = isDark
-      ? ['#22c55e', '#eab308', '#ef4444']
-      : ['#ffffff', '#ffffff', '#ffffff'];
+  // ==========================================
+    // 1. GRÁFICO DE STATUS (Pizza)
+    // Ignoramos o status nele mesmo para mostrar as outras fatias apagadas
+    // ==========================================
+    const actsForStatus = getFilteredDashboardData(true, false);
+    const ctxStatus = document.getElementById('adminStatusChart');
+    if (ctxStatus) {
+        let conc = 0, and = 0, pend = 0;
+        actsForStatus.forEach((a) => {
+            if (a.status === 'concluido') conc++;
+            else if (a.status === 'andamento') and++;
+            else if (a.status === 'pendente') pend++;
+        });
 
-    if (adminStatusChartInstance) adminStatusChartInstance.destroy();
-    adminStatusChartInstance = new Chart(ctxStatus, {
-      type: 'doughnut',
-      data: {
-        labels: ['Concluído', 'Em Andamento', 'Pendente'],
-        datasets: [
-          {
-            data: [conc, and, pend],
-            backgroundColor: bgStatus,
-            borderWidth: 2,
-            borderColor: borderStatus,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom', labels: { color: textColor } },
-        },
-      },
-    });
-  }
+        // Ordem Fixa: 0=Concluído, 1=Andamento, 2=Pendente
+        const statusMap = ['concluido', 'andamento', 'pendente'];
+        
+        // Cores correspondentes: Verde, Amarelo, Vermelho
+        const activeColors = isDark 
+            ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)'] 
+            : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)'];
+            
+        const inactiveColors = isDark
+            ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)']
+            : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)'];
 
+        // Aplica o efeito visual (Borracha / Selecionado)
+        const bgStatus = statusMap.map((st, i) => {
+            if (!window.dashActiveStatus) return activeColors[i];
+            return window.dashActiveStatus === st ? activeColors[i] : inactiveColors[i];
+        });
+
+        if (adminStatusChartInstance) adminStatusChartInstance.destroy();
+        adminStatusChartInstance = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: ['Concluído', 'Em Andamento', 'Pendente'], // Legenda
+                datasets: [{
+                    data: [conc, and, pend], // Dados na mesma ordem
+                    backgroundColor: bgStatus, // Cores na mesma ordem
+                    borderWidth: 2,
+                    borderColor: isDark ? '#1e293b' : '#ffffff',
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const clicked = statusMap[elements[0].index];
+                        window.dashActiveStatus = (window.dashActiveStatus === clicked) ? null : clicked;
+                        refreshAdminDashboard();
+                    }
+                },
+                plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+            }
+        });
+    }
+
+  // ==========================================
+  // 2. GRÁFICO DE CATEGORIA (Barras)
+  // Ignora a própria categoria para o gráfico não sumir, apenas destaca
+  // ==========================================
+  const actsForCategory = getFilteredDashboardData(false, true);
   const ctxCategory = document.getElementById('adminCategoryChart');
   if (ctxCategory) {
-    const catCounts = {};
-    acts.forEach((a) => {
-      const c = a.category || 'Geral';
-      catCounts[c] = (catCounts[c] || 0) + 1;
-    });
-    const labels = Object.keys(catCounts);
-    const data = Object.values(catCounts);
-    const bgColors = labels.map((cat) => {
-      const hue =
-        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
-      return isDark
-        ? `hsla(${hue}, 80%, 60%, 0.75)`
-        : `hsla(${hue}, 85%, 45%, 0.75)`;
-    });
-    const borderColors = labels.map((cat) => {
-      const hue =
-        typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
-      return isDark ? `hsl(${hue}, 80%, 60%)` : `hsl(${hue}, 85%, 45%)`;
-    });
+      const catCounts = {};
+      actsForCategory.forEach((a) => {
+          const c = a.category || 'Geral';
+          catCounts[c] = (catCounts[c] || 0) + 1;
+      });
+      const labels = Object.keys(catCounts);
+      const data = Object.values(catCounts);
 
-    if (adminCategoryChartInstance) adminCategoryChartInstance.destroy();
-    adminCategoryChartInstance = new Chart(ctxCategory, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Atividades',
-            data: data,
-            backgroundColor: bgColors,
-            borderColor: borderColors,
-            borderWidth: 1,
-            borderRadius: 4,
+      // Lógica de transparência nas barras
+      const bgColors = labels.map((cat) => {
+          const hue = typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
+          const isActive = !window.dashActiveCategory || window.dashActiveCategory === cat;
+          const alpha = isActive ? (isDark ? '0.85' : '0.9') : '0.2';
+          return `hsla(${hue}, 80%, 50%, ${alpha})`;
+      });
+
+      if (adminCategoryChartInstance) adminCategoryChartInstance.destroy();
+      adminCategoryChartInstance = new Chart(ctxCategory, {
+          type: 'bar',
+          data: {
+              labels: labels,
+              datasets: [{
+                  label: 'Atividades',
+                  data: data,
+                  backgroundColor: bgColors,
+                  borderRadius: 4,
+              }],
           },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { color: textColor, stepSize: 1 },
-            grid: { color: gridColor },
-          },
-          x: { ticks: { color: textColor }, grid: { display: false } },
-        },
-      },
-    });
+          options: {
+              responsive: true, maintainAspectRatio: false,
+              onClick: (e, elements) => {
+                  if (elements.length > 0) {
+                      const clickedCat = labels[elements[0].index];
+                      window.dashActiveCategory = (window.dashActiveCategory === clickedCat) ? null : clickedCat;
+                      refreshAdminDashboard();
+                  }
+              },
+              plugins: { legend: { display: false } },
+              scales: {
+                  y: { beginAtZero: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                  x: { ticks: { color: textColor }, grid: { display: false } },
+              }
+          }
+      });
   }
 
+  // ==========================================
+  // 3. GRÁFICO DE LINHA DO TEMPO
+  // Este reflete TUDO, se clicar numa categoria, mostra a linha do tempo SÓ daquela categoria
+  // ==========================================
+  const actsTimeline = getFilteredDashboardData(); 
   const ctxTimeline = document.getElementById('adminTimelineChart');
   if (ctxTimeline) {
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      last7Days.push(d.toISOString().split('T')[0]);
-    }
-    const dataTimeline = last7Days.map(
-      (date) => acts.filter((a) => a.date === date).length
-    );
-    const labelsTimeline = last7Days.map((date) => {
-      const p = date.split('-');
-      return `${p[2]}/${p[1]}`;
-    });
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          last7Days.push(d.toISOString().split('T')[0]);
+      }
+      const dataTimeline = last7Days.map(date => actsTimeline.filter((a) => a.date === date).length);
+      const labelsTimeline = last7Days.map((date) => {
+          const p = date.split('-');
+          return `${p[2]}/${p[1]}`;
+      });
 
-    if (adminTimelineChartInstance) adminTimelineChartInstance.destroy();
-    adminTimelineChartInstance = new Chart(ctxTimeline, {
-      type: 'line',
-      data: {
-        labels: labelsTimeline,
-        datasets: [
-          {
-            label: 'Registros',
-            data: dataTimeline,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.3,
-            pointBackgroundColor: '#3b82f6',
+      if (adminTimelineChartInstance) adminTimelineChartInstance.destroy();
+      adminTimelineChartInstance = new Chart(ctxTimeline, {
+          type: 'line',
+          data: {
+              labels: labelsTimeline,
+              datasets: [{
+                  label: 'Registros',
+                  data: dataTimeline,
+                  borderColor: '#3b82f6',
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  borderWidth: 3, fill: true, tension: 0.3, pointBackgroundColor: '#3b82f6',
+              }],
           },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1, color: textColor },
-            grid: { color: gridColor },
-          },
-          x: { ticks: { color: textColor }, grid: { display: false } },
-        },
-      },
-    });
+          options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                  y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: { color: gridColor } },
+                  x: { ticks: { color: textColor }, grid: { display: false } },
+              }
+          }
+      });
   }
 };
 
@@ -760,7 +814,10 @@ function setupAdminNewTaskForm() {
       description: document.getElementById('adminTaskDescription').value,
       status: document.getElementById('adminTaskStatus').value,
       createdAt: new Date().toISOString(),
-    };
+      tipo: 'delegada',
+      delegadaPor: currentUser.id,
+      podeExcluir: false
+  };
 
     const salvarNoBanco = (atividadeFinal) => {
       atividadeFinal.id = nextActivityId;
@@ -1029,7 +1086,7 @@ function setupAdminDelegarForm() {
   const container = document.getElementById('listaCheckFuncionarios');
   if (!container) return;
 
-  const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active && u.id !== currentUser.id);
+const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active);
 
   if (funcDaEmpresa.length === 0) {
       container.innerHTML = '<p style="opacity: 0.6; text-align: center; padding: 10px;">Nenhum colaborador encontrado.</p>';
@@ -1665,14 +1722,6 @@ window.fecharModalAcessos = function() {
         window.unsubscribeAcessos();
         window.unsubscribeAcessos = null;
     }
-};
-
-window.fecharModalAcessos = function() {
-  document.getElementById('modalAcessos').classList.add('hidden');
-};
-
-window.fecharModalAcessos = function() {
-  document.getElementById('modalAcessos').classList.add('hidden');
 };
 
 // =======================================================

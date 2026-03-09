@@ -1,8 +1,34 @@
 <div id="employeeDashboard">
-  <div class="page-header">
-    <h1 id="employeeGreeting"></h1>
-    <p id="currentDate"></p>
-  </div>
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div>
+        <h1 id="employeeGreeting"></h1>
+        <p id="currentDate"></p>
+    </div>
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Categoria">
+            <i class="fa-solid fa-tags" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="funcDashFilterCategory" onchange="refreshFuncDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todas Categorias</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Inicial">
+            <i class="fa-solid fa-calendar-day" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="funcDashFilterStartDate" onchange="refreshFuncDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Final">
+            <i class="fa-solid fa-calendar-check" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="funcDashFilterEndDate" onchange="refreshFuncDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <button onclick="clearFuncDashFilters()" title="Limpar Filtros" style="background: transparent; border: 1px dashed var(--color-border); color: var(--color-text-secondary); border-radius: 8px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+            <i class="fa-solid fa-eraser"></i>
+        </button>
+    </div>
+</div>
 
   <div id="areaAvisosGamificacao"></div>
 
