@@ -161,29 +161,29 @@ async function showAdminSection(sec) {
       loadCategories(c);
       setupAdminSettingsForms();
       if (typeof window.setupAdminGamification === 'function') window.setupAdminGamification();
+      
+      // MÁGICA DO MODO ESCURO NA ABA CONFIGURAÇÕES
+      setTimeout(() => {
+          const check = document.getElementById('chkDarkMode');
+          if (check && currentUser) {
+              check.checked = currentUser.darkMode === true;
+          }
+      }, 200); 
     } else if (sec === 'delegar') {
       const catEl = document.getElementById('delegarCategoria');
       if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); 
       setupAdminDelegarForm();
-      loadTarefasEnviadas();
+      if (typeof loadTarefasEnviadas === 'function') loadTarefasEnviadas();
     }
   } catch (err) {
     palco.innerHTML = `<div class="alert alert-error">Erro ao carregar ecrã: ${err.message}</div>`;
   }
+  
   setTimeout(() => {
     if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
         window.aplicarVisibilidadeGamificacao();
     }
   }, 200);
-  // Dentro da função que mostra as seções do Admin
-if (sec === 'settings') {
-  setTimeout(() => {
-      const check = document.getElementById('chkDarkMode');
-      if (check && currentUser) {
-          check.checked = currentUser.darkMode === true;
-      }
-  }, 200); // Aguarda o HTML carregar para marcar a chave
-}
 }
 
 window.refreshAdminDashboard = function () {
@@ -1221,7 +1221,7 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
               arquivosSelecionados = []; 
               btn.innerHTML = originalText;
               btn.disabled = false;
-              loadTarefasEnviadas(); 
+              if (typeof loadTarefasEnviadas === 'function') loadTarefasEnviadas(); 
           }).catch((err) => {
               showToast('Erro ao enviar.', 'error');
               btn.innerHTML = originalText;
@@ -1274,7 +1274,7 @@ window.aprovarTarefaRevisao = function() {
               status: 'concluido', xpEarned: xpGanho, tarefaVinculadaId: idT
           });
 
-          // Se estiver desativada, simplesmente não mexe na conta do usuário (Resolve Promise vazia)
+          // Se estiver desativada, simplesmente não mexe na conta do usuário
           let p3 = Promise.resolve();
           if (gamificacaoAtiva) {
               p3 = db.collection('usuarios').doc(t.userId.toString()).get().then(uSnap => {
@@ -1299,63 +1299,6 @@ window.aprovarTarefaRevisao = function() {
       });
   });
 };
-
-// 4. Carregar a Tabela de Acompanhamento (Painel do Admin)
-function loadTarefasEnviadas() {
-  const container = document.getElementById('tabelaTarefasEnviadas');
-  if (!container) return;
-
-  container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando tarefas...</div>';
-
-  db.collection('tarefas')
-    .where('senderId', '==', currentUser.id)
-    .get()
-    .then((querySnapshot) => {
-        if (querySnapshot.empty) {
-            container.innerHTML = '<div style="text-align:center; padding: 20px; background: var(--color-bg-primary); border-radius: 8px;">Você ainda não enviou nenhuma tarefa.</div>';
-            return;
-        }
-
-        let lista = [];
-        querySnapshot.forEach(doc => lista.push(doc.data()));
-        
-        lista.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-        let html = `<div class="table-container"><table>
-            <thead><tr><th>Data</th><th>Para Quem</th><th>Categoria</th><th>Tarefa</th><th>Status</th><th>Ações</th></tr></thead><tbody>`;
-        
-        lista.forEach(t => {
-            const func = users.find(u => u.id === t.userId);
-            const nomeFunc = func ? func.name : 'Colaborador Removido';
-            const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
-            
-            const badgeClass = t.status === 'concluido' ? 'badge-concluido' : 'badge-pendente';
-            const badgeText = t.status === 'concluido' ? 'Entregue' : 'Pendente';
-            
-            // Gera a cor visual da categoria
-            const categoriaBadge = `<span class="badge cat-badge-dynamic" style="${getCategoryStyleString(t.category || 'Geral')}">${t.category || 'Geral'}</span>`;
-
-            html += `<tr>
-                <td>${dataFormatada}</td>
-                <td><strong>${nomeFunc}</strong></td>
-                <td>${categoriaBadge}</td>
-                <td>${t.title}</td>
-                <td><span class="badge ${badgeClass}" style="${t.status === 'concluido' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;'}">${badgeText}</span></td>
-                <td>
-                    ${t.status === 'concluido' ? `<button onclick="abrirDetalhesTarefa('${t.id}')" class="btn-icon-only edit" title="Ver Entrega" style="color: var(--color-info);"><i class="fa-solid fa-eye"></i></button>` : ''}
-                    <button onclick="apagarTarefaDelegada('${t.id}')" class="btn-icon-only delete" title="Apagar Tarefa"><i class="fa-solid fa-trash"></i></button>
-                </td>
-            </tr>`;
-        });
-
-        html += `</tbody></table></div>`;
-        container.innerHTML = html;
-    })
-    .catch((err) => {
-        console.error("Erro no acompanhamento:", err);
-        container.innerHTML = '<p style="color: var(--color-danger); text-align:center;">Erro ao carregar o acompanhamento de tarefas.</p>';
-    });
-}
 
 // =========================================================
 // REVISÃO DE TAREFAS PELO ADMIN (COM FLUXOGRAMA DE ERROS)
@@ -1597,6 +1540,7 @@ window.salvarEdicaoTarefa = function() {
       loadTarefasEnviadas();
   });
 };
+
 // ==========================================
 // CONTROLE DAS ABAS E EXCLUSÃO (ADMIN DELEGAR)
 // ==========================================
@@ -1877,34 +1821,63 @@ window.loadAdminRedemptions = function() {
 };
 
 window.aprovarResgate = function(resgateId, preco) {
-  // 1. Abre a caixinha nativa do navegador pedindo o código
-  const pinCode = prompt('💰 Aprovar Resgate:\nCole aqui o código PIN ou o Link do Gift Card (ex: IFD-8472-9912) para entregar ao colaborador:');
+  // 1. Cria um modal customizado injetado na tela para substituir o prompt() nativo
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '999999';
   
-  // 2. Se o gestor colou algo e clicou em OK
-  if (pinCode !== null && pinCode.trim() !== '') {
+  overlay.innerHTML = `
+      <div class="modal-content" style="max-width: 400px; padding: 25px;">
+          <div class="modal-header" style="margin-bottom: 15px;">
+              <h2 style="font-size: 18px;"><i class="fa-solid fa-gift" style="color: var(--color-primary);"></i> Entregar PIN ao Colaborador</h2>
+              <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div>
+              <p style="font-size: 14px; margin-bottom: 15px; color: var(--color-text-secondary);">Cole aqui o código PIN ou o Link do Gift Card (ex: IFD-8472-9912) para finalizar o resgate:</p>
+              <input type="text" id="adminPinInput" class="form-control" placeholder="Digite o código aqui..." style="width: 100%; margin-bottom: 20px; font-size: 16px; padding: 12px; text-align: center; font-weight: bold;">
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                  <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+                  <button class="btn btn-success" id="btnConfirmarPin"><i class="fa-solid fa-check"></i> Aprovar Resgate</button>
+              </div>
+          </div>
+      </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  document.getElementById('adminPinInput').focus(); // Já foca no campo de texto para colar
+  
+  // 2. Ação do botão de Confirmar
+  document.getElementById('btnConfirmarPin').addEventListener('click', () => {
+      const pinCode = document.getElementById('adminPinInput').value.trim();
       
-      // 3. Atualiza o status e SALVA o código PIN no banco
+      if (!pinCode) {
+          return showToast('Insira um código válido para entregar!', 'warning');
+      }
+      
+      const btn = document.getElementById('btnConfirmarPin');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+      btn.disabled = true;
+      
+      // Salva o PIN e aprova a compra
       db.collection('resgates').doc(resgateId.toString()).update({ 
           status: 'aprovado', 
           dataAprovacao: new Date().toISOString(),
-          codigoResgate: pinCode.trim() // <-- Guardamos o PIN secreto aqui!
+          codigoResgate: pinCode // Salva o código!
       }).then(() => {
-          
-          // 4. Debita as moedas do Banco da Empresa (igual antes)
           db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
               let bank = doc.data().companyBank || 0;
               db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
-                  showToast('Resgate aprovado e PIN guardado com sucesso!');
+                  showToast('Resgate aprovado e PIN enviado com sucesso!');
+                  overlay.remove(); // Remove o modal da tela
                   loadAdminRedemptions(); // Recarrega a lista
               });
           });
-          
-      }).catch(err => showToast('Erro ao aprovar.', 'error'));
-      
-  } else if (pinCode === '') {
-      // Se o gestor deixou em branco e deu OK
-      alert('Aprovação cancelada: Você precisa inserir um código válido para entregar o prémio.');
-  }
+      }).catch(err => {
+          showToast('Erro ao aprovar.', 'error');
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Aprovar Resgate';
+          btn.disabled = false;
+      });
+  });
 };
 
 window.recusarResgate = function(resgateId, userId, preco) {
@@ -1939,21 +1912,54 @@ window.openGamiTab = function(tabId, btnElement) {
 };
 
 // =======================================================
-// GAMIFICAÇÃO - FUNÇÕES DIRETAS (SEM FORMULÁRIOS)
+// GAMIFICAÇÃO E LOJA - FUNÇÕES DIRETAS (SEM FORMULÁRIOS)
 // =======================================================
 
-// 1. CARREGA OS DADOS AO ABRIR A ABA
+// Atualiza o texto de ajuda do câmbio em tempo real
+window.updateExchangeRateHelp = function(valor) {
+  const taxa = parseInt(valor) || 10; // Se apagar tudo, assume 10 para o cálculo base
+  const textoAjuda = document.getElementById('gamiExchangeRateHelp');
+  
+  if (textoAjuda) {
+      const custoCalculado = taxa * 50;
+      textoAjuda.innerHTML = `Se colocar <strong>${taxa}</strong>, um Gift Card de R$ 50 custará automaticamente ${custoCalculado} GoCoins para a equipe.`;
+  }
+};
+
+// CARREGA OS DADOS AO ABRIR A ABA
 window.setupAdminGamification = function() {
   db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
       if (doc.exists) {
           const data = doc.data();
           const isAtiva = data.gamificationEnabled === true;
-          // Carrega com os novos prêmios por padrão caso a empresa não os tenha
           const regras = data.gamificacao || { 
-              xpBase: 50, xpNivel: 500, coinsNivel: 100, 
-              pesoFacil: 2, pesoMedia: 3, pesoDificil: 4,
+              xpBase: 50, xpNivel: 500, coinsNivel: 100, pesoFacil: 2, pesoMedia: 3, pesoDificil: 4,
               premioTop1: 500, premioTop2: 400, premioTop3: 300, premioTop4: 200, premioTop5: 100
           };
+
+          const orcamentoMensal = data.monthlyBudget || 500;
+          if (document.getElementById('adminMonthlyBudget')) document.getElementById('adminMonthlyBudget').value = orcamentoMensal;
+
+          // 🔥 NOVO: Carrega o Câmbio e as Marcas Ativas
+          const configLoja = data.giftCardConfig || { rate: 10, active: ['uber', 'netflix', 'xbox', 'spotify', 'playstation', 'steam'] };
+          if (document.getElementById('gamiExchangeRate')) document.getElementById('gamiExchangeRate').value = configLoja.rate;
+          window.updateExchangeRateHelp(configLoja.rate);
+
+          const cbContainer = document.getElementById('adminGiftCardCheckboxes');
+          if (cbContainer && window.apiGiftCardsCatalog) {
+              let cbHtml = '';
+              window.apiGiftCardsCatalog.forEach(card => {
+                  const isChecked = configLoja.active.includes(card.id) ? 'checked' : '';
+                  const iconColor = card.bgColor === '#000000' ? 'var(--color-text-primary)' : card.bgColor;
+                  cbHtml += `
+                  <label style="display: flex; align-items: center; gap: 10px; background: var(--color-bg-secondary); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--color-border); cursor: pointer; user-select: none; transition: 0.2s;">
+                      <input type="checkbox" class="chk-giftcard" value="${card.id}" ${isChecked} style="width: 18px; height: 18px; cursor: pointer;">
+                      <i class="${card.fallbackIcon}" style="color: ${iconColor}; font-size: 22px;"></i>
+                      <strong style="font-size: 14px; color: var(--color-text-primary);">${card.name}</strong>
+                  </label>`;
+              });
+              cbContainer.innerHTML = cbHtml;
+          }
 
           const chk = document.getElementById('chkGamificacaoMaster');
           if (chk) chk.checked = isAtiva;
@@ -1961,12 +1967,9 @@ window.setupAdminGamification = function() {
           const area = document.getElementById('gamiSettingsArea');
           if (area) area.style.display = isAtiva ? 'block' : 'none';
 
-          // Preenche todos os inputs
           const campos = ['gamiXpBase', 'gamiXpNivel', 'gamiCoinsNivel', 'gamiPesoFacil', 'gamiPesoMedia', 'gamiPesoDificil', 'gamiPremioTop1', 'gamiPremioTop2', 'gamiPremioTop3', 'gamiPremioTop4', 'gamiPremioTop5'];
-          
           campos.forEach(id => {
               if(document.getElementById(id)) {
-                  // Pega o ID (ex: gamiPremioTop1) e converte na chave do banco (premioTop1)
                   const key = id.replace('gami', '');
                   const finalKey = key.charAt(0).toLowerCase() + key.slice(1);
                   document.getElementById(id).value = regras[finalKey];
@@ -1979,13 +1982,13 @@ window.setupAdminGamification = function() {
   });
 };
 
-// 2. DISPARADO AO CLICAR NA CHAVINHA
+// DISPARADO AO CLICAR NA CHAVINHA
 window.alternarChaveGamificacao = function(checkboxElement) {
   const isAtiva = checkboxElement.checked;
   
   document.getElementById('gamiSettingsArea').style.display = isAtiva ? 'block' : 'none';
-  document.getElementById('gamiToggleIcon').style.color = isAtiva ? 'var(--color-success)' : 'var(--color-danger)';
-  document.getElementById('gamiToggleText').innerText = isAtiva ? 'Gamificação Ativada' : 'Gamificação Desativada';
+  if (document.getElementById('gamiToggleIcon')) document.getElementById('gamiToggleIcon').style.color = isAtiva ? 'var(--color-success)' : 'var(--color-danger)';
+  if (document.getElementById('gamiToggleText')) document.getElementById('gamiToggleText').innerText = isAtiva ? 'Gamificação Ativada' : 'Gamificação Desativada';
 
   db.collection('empresas').doc(currentUser.companyId.toString()).set({ gamificationEnabled: isAtiva }, { merge: true }).then(() => {
       const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
@@ -1996,13 +1999,12 @@ window.alternarChaveGamificacao = function(checkboxElement) {
   });
 };
 
-// 3. DISPARADO AO CLICAR EM SALVAR
+// DISPARADO AO CLICAR EM SALVAR
 window.salvarRegrasGamificacao = function(btnElement) {
   const txtOriginal = btnElement.innerHTML;
   btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
   btnElement.disabled = true;
 
-  // Recolhe todos os valores
   const novasRegras = {
       xpBase: parseInt(document.getElementById('gamiXpBase').value) || 50,
       xpNivel: parseInt(document.getElementById('gamiXpNivel').value) || 500,
@@ -2017,20 +2019,37 @@ window.salvarRegrasGamificacao = function(btnElement) {
       premioTop5: parseInt(document.getElementById('gamiPremioTop5').value) || 100
   };
 
-  db.collection('empresas').doc(currentUser.companyId.toString()).set({ gamificacao: novasRegras }, { merge: true }).then(() => {
-      const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
-      if (compIndex !== -1) companies[compIndex].gamificacao = novasRegras;
+  const inputOrcamento = document.getElementById('adminMonthlyBudget');
+  const novoOrcamento = inputOrcamento ? parseFloat(inputOrcamento.value) : 500;
 
-      showToast('Regras atualizadas!');
-      btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+  // Captura os Gift Cards marcados e a Taxa de Câmbio
+  const activeCards = Array.from(document.querySelectorAll('.chk-giftcard:checked')).map(cb => cb.value);
+  const rateInput = document.getElementById('gamiExchangeRate');
+  const novaConfigLoja = {
+      rate: rateInput ? parseInt(rateInput.value) || 10 : 10,
+      active: activeCards
+  };
+
+  db.collection('empresas').doc(currentUser.companyId.toString()).set({ 
+      gamificacao: novasRegras,
+      monthlyBudget: novoOrcamento,
+      giftCardConfig: novaConfigLoja // Guarda no Firebase
+  }, { merge: true }).then(() => {
       
-      // Atualiza os rankings na tela para refletir os novos valores imediatamente
-      if(typeof window.renderRankingMensal === 'function') {
-          window.renderRankingMensal('rankingAdminContainer');
-          window.renderRankingMensal('rankingFuncContainer');
+      const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
+      if (compIndex !== -1) {
+          companies[compIndex].gamificacao = novasRegras;
+          companies[compIndex].monthlyBudget = novoOrcamento;
+          companies[compIndex].giftCardConfig = novaConfigLoja;
       }
 
+      showToast('Configurações da Loja atualizadas!');
+      btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+      
       setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
+  }).catch(err => {
+      showToast('Erro ao salvar!', 'error');
+      btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
   });
 };
 
