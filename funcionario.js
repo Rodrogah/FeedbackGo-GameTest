@@ -1,5 +1,6 @@
 // ============ MOTOR DE NAVEGAÇÃO DO FUNCIONÁRIO ============
 async function showEmployeeSection(sec) {
+  localStorage.setItem('feedbackgo_ultimaAbaFuncionario', sec);
   const palco = document.getElementById('funcConteudoDinamico'); 
   if (!palco) return console.error('Erro fatal: funcConteudoDinamico não existe!');
 
@@ -21,8 +22,9 @@ async function showEmployeeSection(sec) {
       history: 'func-historico.html',
       settings: 'func-configuracoes.html',
       'tarefas-recebidas': 'func-tarefas-recebidas.html',
-      store: 'func-loja.html'
-    };
+      store: 'func-loja.html',
+      resgates: 'func-resgates.html' 
+};
     
     const resposta = await fetch(`./telas/${rotas[sec]}`);
     if (!resposta.ok) throw new Error('Erro de fetch: Ficheiro não encontrado.');
@@ -90,8 +92,18 @@ async function showEmployeeSection(sec) {
 
     } else if (sec === 'tarefas-recebidas') {
       setupFuncionarioTarefas();
+
     } else if (sec === 'store') {
-      if (typeof setupFuncStore === 'function') setupFuncStore();
+      if (typeof setupFuncStore === 'function') {
+          setupFuncStore();
+          setTimeout(loadFuncRedemptions, 200); // Carrega a tabela de PINs
+      }
+
+    } else if (sec === 'resgates') {
+      // Pequeno delay para garantir que o HTML carregou antes de buscar os dados
+      setTimeout(() => {
+          if (typeof window.loadFuncRedemptions === 'function') window.loadFuncRedemptions();
+      }, 150);
     }
 
   } catch (err) {
@@ -156,8 +168,11 @@ function initEmployeePanel() {
     }
 }
 
-  showEmployeeSection('dashboard');
-  setTimeout(runAutoCleanup, 5000);
+ // RECUPERA A ABA OU VAI PARA O DASHBOARD SE FOR A PRIMEIRA VEZ
+ const ultimaAba = localStorage.getItem('feedbackgo_ultimaAbaFuncionario') || 'dashboard';
+ showEmployeeSection(ultimaAba);
+ 
+ setTimeout(runAutoCleanup, 5000);
 }
 
 // ==========================================
@@ -811,7 +826,6 @@ window.radarGamificacao = null;
 window.atualizarPainelGamificacao = function() {
     if (!document.getElementById('userLevelDisplay')) return;
     
-    // Se o radar ainda não estiver ligado, liga-o agora!
     if (!window.radarGamificacao) {
         window.radarGamificacao = db.collection('usuarios')
             .doc(currentUser.id.toString())
@@ -819,17 +833,14 @@ window.atualizarPainelGamificacao = function() {
                 if (doc.exists) {
                     const u = doc.data();
                     
-                    // Atualiza a memória instantaneamente
                     currentUser.xp = u.xp || 0;
                     currentUser.goCoins = u.goCoins || 0;
                     currentUser.level = u.level || 1;
                     
-                    // Manda pintar a tela com os novos dados
                     renderizarBarraGamificacao();
                 }
             });
     } else {
-        // Se já estiver ligado, apenas pinta a tela
         renderizarBarraGamificacao();
     }
 };
@@ -1031,7 +1042,70 @@ window.solicitarResgate = function(premioId, premioNome, preco) {
           btnOriginal.disabled = false;
       });
   }
+
+// Lógica para mostrar a etiqueta ou o Botão do PIN
+let statusDisplay = '';
+if (r.status === 'pendente') {
+    statusDisplay = `<span class="badge badge-pendente" style="background:#fef9c3; color:#ca8a04;"><i class="fa-solid fa-clock"></i> Pendente</span>`;
+} else if (r.status === 'recusado') {
+    statusDisplay = `<span class="badge badge-danger" style="background:#fee2e2; color:#dc2626;"><i class="fa-solid fa-xmark"></i> Devolvido</span>`;
+} else if (r.status === 'aprovado') {
+    // Aqui está a magia! Se foi aprovado, ele mostra um botão brilhante com o PIN.
+    statusDisplay = `<button class="btn btn-small" style="background: var(--color-primary); color: white; border: none; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); transform: scale(1.05); font-weight: bold; cursor: pointer;" onclick="verCodigoResgate('${r.codigoResgate}')">
+        <i class="fa-solid fa-gift"></i> Abrir Prémio
+    </button>`;
+}
+
+// Depois você coloca a variável ${statusDisplay} no HTML da linha/card do funcionário!
+// ...
 };
+
+window.loadFuncRedemptions = function() {
+    const container = document.getElementById('listaMeusResgates');
+    if (!container) return;
+  
+    container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> A carregar...</div>';
+  
+    db.collection('resgates')
+      .where('userId', '==', currentUser.id)
+      .get()
+      .then(snap => {
+        if (snap.empty) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.6;">Nenhum resgate encontrado.</div>';
+          return;
+        }
+  
+        let html = '<div class="table-container"><table><thead><tr><th>Data</th><th>Prémio</th><th>Coins</th><th>Status / PIN</th></tr></thead><tbody>';
+  
+        snap.forEach(doc => {
+          const r = doc.data();
+          const dataP = new Date(r.createdAt).toLocaleDateString('pt-BR');
+          
+          // DEBUG: Cole isto para ver no console do navegador (F12) se o código está vindo
+          console.log("Prêmio:", r.premioNome, "PIN no Banco:", r.codigoResgate);
+  
+          let statusHtml = '';
+          if (r.status === 'pendente') {
+              statusHtml = '<span class="badge" style="background:#fef9c3; color:#ca8a04;">Pendente</span>';
+          } else if (r.status === 'aprovado') {
+              // Pegamos o código ou enviamos uma string vazia para evitar o 'undefined'
+              const pinVal = r.codigoResgate || "";
+              
+              statusHtml = `<button class="btn btn-small" 
+                  style="background:var(--color-primary); color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;" 
+                  onclick="verCodigoResgate('${pinVal}')">
+                  <i class="fa-solid fa-gift"></i> Ver PIN
+              </button>`;
+          } else {
+              statusHtml = '<span class="badge" style="background:#fee2e2; color:#dc2626;">Recusado</span>';
+          }
+  
+          html += `<tr><td>${dataP}</td><td><strong>${r.premioNome}</strong></td><td>${r.preco}</td><td>${statusHtml}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      });
+  };
 
 // =======================================================
 // ESTÚDIO DE AVATARES FUNCIONÁRIO - LORELEI EXCLUSIVO
@@ -1239,7 +1313,7 @@ window.verificarRecompensasPendentes = function() {
                       </div>
                       <div>
                           <h3 style="margin: 0 0 4px 0; font-size: 18px; color: white;">Parabéns! Ficaste no Top ${minhaPosicaoIndex + 1} de ${nomeDoMes}!</h3>
-                          <p style="margin: 0; font-size: 14px; opacity: 0.9;">O teu esforço foi recompensado. Resgata o teu prémio do pódio.</p>
+                          <p style="margin: 0; font-size: 14px; opacity: 0.9;">O teu esforço foi recompensado. Resgata o teu prêmio do pódio.</p>
                       </div>
                   </div>
                   <button onclick="resgatarPremioDoRanking('${mes}', ${premioMoedas})" style="background: white; color: #d97706; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: 0.2s; min-width: 160px;">
@@ -1292,4 +1366,124 @@ window.resgatarPremioDoRanking = function(mesId, valorMoedas) {
       btn.innerHTML = `RESGATAR <i class="fa-solid fa-coins"></i> ${valorMoedas}`;
       btn.disabled = false;
   });
+};
+
+// ==========================================
+// SISTEMA DE RESGATES E PIN (FUNCIONÁRIO)
+// ==========================================
+
+window.verMeuCodigoSecreto = function(codigo) {
+    if (!codigo || codigo === "undefined" || codigo === "") {
+        return alert('Aguarde: O gestor ainda não inseriu o código deste prémio.');
+    }
+
+    // 1. Cria o fundo escuro (overlay)
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    overlay.style.zIndex = '99999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    // 2. Cria a janela
+    const modal = document.createElement('div');
+    modal.style.background = 'var(--color-bg-primary, #ffffff)';
+    modal.style.padding = '30px';
+    modal.style.borderRadius = '16px';
+    modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    modal.style.textAlign = 'center';
+    modal.style.maxWidth = '350px';
+    modal.style.width = '90%';
+
+    // 3. O visual (Agora com um ID na caixinha verde e um texto de aviso invisível)
+    modal.innerHTML = `
+        <h3 style="margin-top: 0; color: var(--color-text-primary, #1e293b); font-size: 22px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-gift" style="color: #10b981;"></i> Prémio Disponível!
+        </h3>
+        <p style="color: var(--color-text-secondary, #64748b); margin-bottom: 20px; font-size: 14px;">
+            Clica na caixa abaixo para copiar o teu PIN:
+        </p>
+        
+        <div id="caixaPinCopiar" style="background: #ecfdf5; border: 2px dashed #10b981; padding: 20px; border-radius: 8px; font-size: 24px; font-weight: 900; color: #059669; letter-spacing: 2px; cursor: pointer; user-select: none; margin-bottom: 5px; transition: all 0.3s ease;" title="Clica para copiar!">
+            ${codigo}
+        </div>
+        
+        <p id="msgCopiado" style="color: #10b981; font-size: 13px; font-weight: bold; margin-top: 0; margin-bottom: 20px; opacity: 0; transition: opacity 0.3s ease; height: 15px;">
+            <i class="fa-solid fa-check-double"></i> Copiado com sucesso!
+        </p>
+
+        <button id="btnFecharMeuPin" style="background: var(--color-primary, #6366f1); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; transition: 0.2s;">
+            Fechar
+        </button>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // 4. A MÁGICA: Evento de clique na caixa verde
+    document.getElementById('caixaPinCopiar').addEventListener('click', function() {
+        // Usa a API do navegador para copiar o texto invisível
+        navigator.clipboard.writeText(codigo).then(() => {
+            // Efeito visual: A caixa fica toda verde e o texto branco
+            this.style.background = '#10b981';
+            this.style.color = '#ffffff';
+            
+            // Mostra o texto "Copiado com sucesso!"
+            document.getElementById('msgCopiado').style.opacity = '1';
+
+            // Depois de 1.5 segundos, volta tudo ao normal para ele ver o código de novo
+            setTimeout(() => {
+                this.style.background = '#ecfdf5';
+                this.style.color = '#059669';
+                document.getElementById('msgCopiado').style.opacity = '0';
+            }, 1500);
+        }).catch(err => {
+            console.error('Erro ao copiar: ', err);
+        });
+    });
+
+    // 5. Botão de Fechar
+    document.getElementById('btnFecharMeuPin').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+    });
+};
+
+// Função para desenhar a tabela
+window.loadFuncRedemptions = function() {
+    const box = document.getElementById('listaMeusResgates');
+    if (!box) return;
+
+    db.collection('resgates').where('userId', '==', currentUser.id).get().then(snap => {
+        if (snap.empty) {
+            box.innerHTML = '<p style="padding:20px; opacity:0.5; text-align:center;">Nenhum resgate encontrado.</p>';
+            return;
+        }
+
+        let tabela = `<div style="overflow-x:auto;"><table>
+            <thead><tr><th>Data</th><th>Item</th><th>PIN / Status</th></tr></thead>
+            <tbody>`;
+
+        snap.forEach(doc => {
+            const r = doc.data();
+            const dataF = new Date(r.createdAt).toLocaleDateString('pt-BR');
+            
+            let acao = '';
+            if (r.status === 'aprovado') {
+                // Passamos o PIN direto para a função window
+                acao = `<button class="btn btn-small" onclick="window.verMeuCodigoSecreto('${r.pin_entrega || ""}')" style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">VER PIN</button>`;
+            } else {
+                acao = `<span style="font-size:12px; opacity:0.6;">${r.status.toUpperCase()}</span>`;
+            }
+
+            tabela += `<tr><td>${dataF}</td><td><b>${r.premioNome}</b></td><td>${acao}</td></tr>`;
+        });
+
+        tabela += '</tbody></table></div>';
+        box.innerHTML = tabela;
+    });
 };

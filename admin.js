@@ -35,10 +35,15 @@ function initAdminPanel() {
   updateCurrentDate('adminCurrentDate');
   showAdminSection('dashboard');
   setTimeout(runAutoCleanup, 5000);
+
+  // No final da initAdminPanel():
+  const abaGuardada = localStorage.getItem('feedbackgo_aba_admin') || 'dashboard';
+  showAdminSection(abaGuardada);
 }
 
 // 🔥 FUNÇÃO GLOBAL PARA TROCAR DE TELA INSTANTANEAMENTE
 window.alternarVisaoHibrida = function(destino) {
+  localStorage.setItem('feedbackgo_modo_hibrido', destino);
   const pAdmin = document.getElementById('adminPanel');
   const pFunc = document.getElementById('employeePanel');
   
@@ -57,6 +62,7 @@ window.alternarVisaoHibrida = function(destino) {
 };
 
 async function showAdminSection(sec) {
+  localStorage.setItem('feedbackgo_aba_admin', sec);
   const palco = document.getElementById('adminConteudoDinamico');
   if (!palco) return;
 
@@ -1872,17 +1878,35 @@ window.loadAdminRedemptions = function() {
 };
 
 window.aprovarResgate = function(resgateId, preco) {
-  if(confirm('Ao clicar em OK, você confirma que o prémio já foi entregue ao funcionário (ex: Vale enviado por email). Confirmar?')) {
-      // Marca como aprovado e debita o valor do Banco da Empresa
-      db.collection('resgates').doc(resgateId.toString()).update({ status: 'aprovado', dataAprovacao: new Date().toISOString() }).then(() => {
+  // 1. Abre a caixinha nativa do navegador pedindo o código
+  const pinCode = prompt('💰 Aprovar Resgate:\nCole aqui o código PIN ou o Link do Gift Card (ex: IFD-8472-9912) para entregar ao colaborador:');
+  
+  // 2. Se o gestor colou algo e clicou em OK
+  if (pinCode !== null && pinCode.trim() !== '') {
+      
+      // 3. Atualiza o status e SALVA o código PIN no banco
+      db.collection('resgates').doc(resgateId.toString()).update({ 
+        status: 'aprovado', 
+        dataAprovacao: new Date().toISOString(),
+        pin_entrega: pinCode.trim() // <-- Mudei para pin_entrega para evitar conflitos!
+    }).then(() => {
+        showToast('Prémio entregue com sucesso!');
+        loadAdminRedemptions();
+          
+          // 4. Debita as moedas do Banco da Empresa (igual antes)
           db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
               let bank = doc.data().companyBank || 0;
               db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
-                  showToast('Resgate concluído e entregue!');
-                  loadAdminRedemptions();
+                  showToast('Resgate aprovado e PIN guardado com sucesso!');
+                  loadAdminRedemptions(); // Recarrega a lista
               });
           });
-      });
+          
+      }).catch(err => showToast('Erro ao aprovar.', 'error'));
+      
+  } else if (pinCode === '') {
+      // Se o gestor deixou em branco e deu OK
+      alert('Aprovação cancelada: Você precisa inserir um código válido para entregar o prémio.');
   }
 };
 

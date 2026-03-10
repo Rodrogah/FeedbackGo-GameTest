@@ -204,12 +204,25 @@ function showPanel(userOrRole) {
   if (pAdmin) pAdmin.classList.add('hidden');
   if (pFunc) pFunc.classList.add('hidden');
 
-  // 5. Mostra o painel correto removendo a classe (Fura o bloqueio do CSS!)
-  if (role === 'admin' || role === 'hibrido') { 
+  // 5. Mostra o painel correto com a MÁGICA DO F5!
+  if (role === 'admin') { 
     if (pAdmin) pAdmin.classList.remove('hidden');
     if (typeof initAdminPanel === 'function') initAdminPanel();
-  } else {
+    
+  } else if (role === 'funcionario') {
     if (pFunc) pFunc.classList.remove('hidden');
     if (typeof initEmployeePanel === 'function') initEmployeePanel();
+    
+  } else if (role === 'hibrido') {
+    // === LÊ A MEMÓRIA PARA SABER QUAL A "ROUPA" QUE ESTAVA A USAR ===
+    const modoSalvo = localStorage.getItem('feedbackgo_modo_hibrido') || 'admin';
+    
+    if (modoSalvo === 'funcionario') {
+        if (pFunc) pFunc.classList.remove('hidden');
+        if (typeof initEmployeePanel === 'function') initEmployeePanel();
+    } else {
+        if (pAdmin) pAdmin.classList.remove('hidden');
+        if (typeof initAdminPanel === 'function') initAdminPanel();
+    }
   }
 }
