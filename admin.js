@@ -1846,30 +1846,44 @@ window.aprovarResgate = function(resgateId, preco) {
   document.body.appendChild(overlay);
   document.getElementById('adminPinInput').focus(); // Já foca no campo de texto para colar
   
-  // 2. Ação do botão de Confirmar
-  document.getElementById('btnConfirmarPin').addEventListener('click', () => {
-      const pinCode = document.getElementById('adminPinInput').value.trim();
-      
-      if (!pinCode) {
-          return showToast('Insira um código válido para entregar!', 'warning');
-      }
-      
-      const btn = document.getElementById('btnConfirmarPin');
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
-      btn.disabled = true;
-      
-      // Salva o PIN e aprova a compra
-      db.collection('resgates').doc(resgateId.toString()).update({ 
+  // 2. Ação do botão de Confirmar (No admin.js)
+    document.getElementById('btnConfirmarPin').addEventListener('click', () => {
+        const pinCode = document.getElementById('adminPinInput').value.trim();
+        
+        if (!pinCode) {
+            return showToast('Insira um código válido para entregar!', 'warning');
+        }
+        
+        const btn = document.getElementById('btnConfirmarPin');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+        btn.disabled = true;
+        
+        // Salva o PIN e aprova a compra
+        db.collection('resgates').doc(resgateId.toString()).update({ 
           status: 'aprovado', 
           dataAprovacao: new Date().toISOString(),
-          codigoResgate: pinCode // Salva o código!
+          codigoResgate: pinCode 
       }).then(() => {
-          db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
-              let bank = doc.data().companyBank || 0;
+          db.collection('empresas').doc(currentUser.companyId.toString()).get().then(docEmpresa => {
+              let bank = docEmpresa.data().companyBank || 0;
               db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
+                  
+                  // 🔥 NOVO: DISPARA A NOTIFICAÇÃO PARA O CELULAR DO FUNCIONÁRIO
+                  db.collection('resgates').doc(resgateId.toString()).get().then(docResgate => {
+                      const donoDoResgate = docResgate.data().userId;
+                      const nomeDoPremio = docResgate.data().premioNome;
+                      
+                      db.collection('notificacoes').add({
+                          userId: donoDoResgate,
+                          titulo: '🎁 O seu prémio chegou!',
+                          mensagem: `O PIN do seu ${nomeDoPremio} já está disponível na sua conta!`,
+                          createdAt: new Date().toISOString()
+                      });
+                  });
+
                   showToast('Resgate aprovado e PIN enviado com sucesso!');
-                  overlay.remove(); // Remove o modal da tela
-                  loadAdminRedemptions(); // Recarrega a lista
+                  overlay.remove(); 
+                  loadAdminRedemptions(); 
               });
           });
       }).catch(err => {
@@ -1878,7 +1892,6 @@ window.aprovarResgate = function(resgateId, preco) {
           btn.disabled = false;
       });
   });
-};
 
 window.recusarResgate = function(resgateId, userId, preco) {
   if(confirm('Cancelar pedido e devolver as moedas para o colaborador?')) {
@@ -2227,4 +2240,5 @@ window.salvarPerfilStudio = function(btnElement) {
         showToast('Erro ao guardar no sistema.', 'error');
         btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
     });
-};
+  };
+}

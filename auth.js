@@ -274,6 +274,9 @@ window.showPanel = function(userOrRole) {
   const appInterface = document.getElementById('app-interface');
   if (appInterface) appInterface.style.display = 'block';
 
+  if (typeof solicitarPermissaoNotificacao === 'function') solicitarPermissaoNotificacao();
+  if (typeof iniciarRadarNotificacoes === 'function') iniciarRadarNotificacoes();
+
   let role = 'funcionario'; 
   if (typeof userOrRole === 'string') {
       role = userOrRole;

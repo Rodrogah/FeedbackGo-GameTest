@@ -1012,3 +1012,63 @@ if (c.lastBudgetMonth !== mesAtual) {
     } catch(e) { console.error("Erro ao virar o mês:", e); }
 }
 };
+
+// =======================================================
+// MOTOR DE NOTIFICAÇÕES NATIVAS (CELULAR E PC)
+// =======================================================
+
+// 1. Pede autorização para enviar notificações
+window.solicitarPermissaoNotificacao = function() {
+  if (!("Notification" in window)) {
+      console.log("Este navegador não suporta notificações nativas.");
+      return;
+  }
+  if (Notification.permission !== "denied" && Notification.permission !== "granted") {
+      Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+              console.log("Permissão para notificações concedida!");
+          }
+      });
+  }
+};
+
+// 2. O Radar que fica à escuta de mensagens novas no Firebase
+window.iniciarRadarNotificacoes = function() {
+  if (!currentUser) return;
+
+  // Pega a hora exata do login para não apitar notificações velhas
+  const agora = new Date().toISOString();
+
+  db.collection('notificacoes')
+    .where('userId', '==', currentUser.id)
+    .where('createdAt', '>=', agora) // Só ouve o que chegar DEPOIS de logar
+    .onSnapshot(snap => {
+        snap.docChanges().forEach(change => {
+            if (change.type === 'added') {
+                const notif = change.doc.data();
+                dispararNotificacaoNativa(notif.titulo, notif.mensagem);
+            }
+        });
+    });
+};
+
+// 3. A função que faz o celular apitar de verdade!
+window.dispararNotificacaoNativa = function(titulo, mensagem) {
+  // Se ele autorizou, manda o Push Nativo
+  if (Notification.permission === "granted") {
+      const n = new Notification(titulo, {
+          body: mensagem,
+          icon: 'https://cdn-icons-png.flaticon.com/512/5661/5661092.png', // Ícone de presente genérico
+          vibrate: [200, 100, 200] // Faz o celular vibrar!
+      });
+      
+      // Se clicar na notificação, foca na tela do app
+      n.onclick = function() {
+          window.focus();
+          n.close();
+      };
+  } else {
+      // Se ele não autorizou o push do celular, mostra pelo menos o Toast verde na tela
+      showToast(`🔔 ${titulo}: ${mensagem}`, 'success');
+  }
+};
