@@ -1,7 +1,9 @@
 // ============ LÓGICA DO PAINEL DE ADMINISTRAÇÃO ============
-function initAdminPanel() {
-  const c = companies.find((x) => x.id === currentUser.companyId);
+function initAdminPanel(abaForcada = null) {
+  // Conversão segura de IDs para não falhar na busca
+  const c = companies.find((x) => String(x.id) === String(currentUser.companyId));
   if (!c) return;
+
   document.getElementById('admCompanySidebar').textContent = c.name;
   document.getElementById('sidebarAdminName').textContent = currentUser.name.split(' ')[0];
   
@@ -14,13 +16,11 @@ function initAdminPanel() {
       }
   }
 
-  // Injeta o botão de trocar no TOPO do menu lateral
   if (currentUser.role === 'hibrido') {
     let btnBox = document.getElementById('boxSwitchToFunc');
     if (!btnBox) {
         const nav = document.querySelector('#adminPanel .sidebar-nav');
         if(nav) {
-            // Mudou de 'beforeend' para 'afterbegin' e o border foi para baixo
             nav.insertAdjacentHTML('afterbegin', `
               <div id="boxSwitchToFunc" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #1e293b; padding-left: 12px; padding-right: 12px; padding-top: 5px;">
                   <button onclick="alternarVisaoHibrida('func')" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); width: 100%; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);">
@@ -30,55 +30,64 @@ function initAdminPanel() {
             `);
         }
     }
-}
+  }
 
   updateCurrentDate('adminCurrentDate');
-  showAdminSection('dashboard');
-  setTimeout(runAutoCleanup, 5000);
+  
+  // 🛡️ MÁGICA DA BLINDAGEM: Limpa qualquer lixo da memória
+  let abaParaAbrir = abaForcada || localStorage.getItem('feedbackgo_aba_admin') || 'dashboard';
+  abaParaAbrir = String(abaParaAbrir).replace(/['"]/g, '').trim(); // Tira aspas acidentais
+  if (abaParaAbrir === 'null' || abaParaAbrir === 'undefined' || abaParaAbrir === '') {
+      abaParaAbrir = 'dashboard';
+  }
 
-  // No final da initAdminPanel():
-  const abaGuardada = localStorage.getItem('feedbackgo_aba_admin') || 'dashboard';
-  showAdminSection(abaGuardada);
+  showAdminSection(abaParaAbrir);
+  setTimeout(runAutoCleanup, 5000);
 }
 
 // 🔥 FUNÇÃO GLOBAL PARA TROCAR DE TELA INSTANTANEAMENTE
 window.alternarVisaoHibrida = function(destino) {
+  // SALVA A ROUPA NOVA
   localStorage.setItem('feedbackgo_modo_hibrido', destino);
+
   const pAdmin = document.getElementById('adminPanel');
   const pFunc = document.getElementById('employeePanel');
   
-  // Fecha os menus no mobile para não ficarem presos
   document.querySelectorAll('.sidebar-nav').forEach(n => n.classList.remove('open'));
   
   if (destino === 'func') {
       if(pAdmin) pAdmin.classList.add('hidden');
       if(pFunc) pFunc.classList.remove('hidden');
-      if (typeof initEmployeePanel === 'function') initEmployeePanel();
+      if (typeof initEmployeePanel === 'function') initEmployeePanel(localStorage.getItem('feedbackgo_aba_func'));
   } else {
       if(pFunc) pFunc.classList.add('hidden');
       if(pAdmin) pAdmin.classList.remove('hidden');
-      if (typeof initAdminPanel === 'function') initAdminPanel();
+      if (typeof initAdminPanel === 'function') initAdminPanel(localStorage.getItem('feedbackgo_aba_admin'));
   }
 };
 
 async function showAdminSection(sec) {
-  localStorage.setItem('feedbackgo_aba_admin', sec);
   const palco = document.getElementById('adminConteudoDinamico');
   if (!palco) return;
 
-  document.querySelectorAll('#adminPanel .nav-item').forEach((i) => i.classList.remove('active'));
-  const activeNav = document.querySelector(`#adminPanel .nav-item[onclick*="${sec}"]`);
-  if (activeNav) activeNav.classList.add('active');
+  // 🛡️ MÁGICA DA BLINDAGEM 2: Garante que a rota existe
+  sec = String(sec).replace(/['"]/g, '').trim();
+  if (sec === 'null' || sec === 'undefined' || sec === '') sec = 'dashboard';
+  localStorage.setItem('feedbackgo_aba_admin', sec);
 
-  // Verifica se a gamificação está ativa
-  const c = companies.find((x) => x.id === currentUser.companyId);
+  // O bloco try/catch impede que a tela fique branca se o botão não for encontrado
+  try {
+      document.querySelectorAll('#adminPanel .nav-item').forEach((i) => i.classList.remove('active'));
+      const activeNav = document.querySelector(`#adminPanel .nav-item[onclick*="${sec}"]`);
+      if (activeNav) activeNav.classList.add('active');
+  } catch(e) { console.warn("Erro inofensivo no menu resolvido."); }
+
+  const c = companies.find((x) => String(x.id) === String(currentUser.companyId));
   const isGamiAtiva = c && c.gamificationEnabled === true;
   
-  // Esconde ou mostra o menu da loja
   const menuLojaAdmin = document.querySelector('#adminPanel .nav-item[onclick*="store"]');
   if (menuLojaAdmin) menuLojaAdmin.style.display = isGamiAtiva ? 'flex' : 'none';
   
-  // Esconde o ranking do dashboard do admin se desativado
   setTimeout(() => {
       const rankingAdmin = document.getElementById('rankingAdminContainer');
       if (rankingAdmin && !isGamiAtiva) rankingAdmin.parentElement.style.display = 'none';
@@ -104,6 +113,9 @@ async function showAdminSection(sec) {
       store: 'admin-loja.html'
     };
 
+    // Se a rota for inválida, força o dashboard para não crachar
+    if (!rotas[sec]) sec = 'dashboard';
+
     const resposta = await fetch(`./telas/${rotas[sec]}`);
     if (!resposta.ok) throw new Error('Ficheiro não encontrado.');
     palco.innerHTML = await resposta.text();
@@ -112,8 +124,6 @@ async function showAdminSection(sec) {
     palco.classList.add('fade-entrar');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const c = companies.find((x) => x.id === currentUser.companyId);
-
     if (sec === 'dashboard') {
       const dashTeam = document.getElementById('dashFilterTeam');
       if (dashTeam) dashTeam.innerHTML = '<option value="">Todas as Equipes</option>' + (c.teams || []).map((t) => `<option value="${t}">${t}</option>`).join('');
@@ -121,7 +131,7 @@ async function showAdminSection(sec) {
     } else if (sec === 'new-task') {
       if (typeof setTodayDate === 'function') setTodayDate('adminTaskDate');
       const catEl = document.getElementById('adminTaskCategory');
-      if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); // <--- AQUI CHAMA O AGRUPAMENTO
+      if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); 
       setupAdminNewTaskForm();
     } else if (sec === 'all-activities') {
       populateAdminFilters(c);
@@ -136,31 +146,13 @@ async function showAdminSection(sec) {
       setupNewTeamForm();
     } else if (sec === 'reports') {
       const teamFilter = document.getElementById('reportFilterTeam');
-      if (teamFilter)
-        teamFilter.innerHTML =
-          '<option value="">Todas as Equipes</option>' +
-          (c.teams || [])
-            .map((t) => `<option value="${t}">${t}</option>`)
-            .join('');
+      if (teamFilter) teamFilter.innerHTML = '<option value="">Todas as Equipes</option>' + (c.teams || []).map((t) => `<option value="${t}">${t}</option>`).join('');
       const userFilter = document.getElementById('reportFilterUser');
-      if (userFilter)
-        userFilter.innerHTML =
-          '<option value="">Todos os Colaboradores</option>' +
-          users
-            .filter((u) => u.companyId === c.id)
-            .map((u) => `<option value="${u.id}">${u.name}</option>`)
-            .join('');
-            
-      // NOVO: Carrega as categorias no Select de Relatórios!
+      if (userFilter) userFilter.innerHTML = '<option value="">Todos os Colaboradores</option>' + users.filter((u) => u.companyId === c.id).map((u) => `<option value="${u.id}">${u.name}</option>`).join('');
       const catFilter = document.getElementById('reportFilterCategory');
-      if (catFilter) {
-          catFilter.innerHTML = '<option value="">Todas as Categorias</option>' + 
-          (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
-      }
-
+      if (catFilter) catFilter.innerHTML = '<option value="">Todas as Categorias</option>' + (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
     } else if (sec === 'store') {
       if (typeof setupAdminStore === 'function') setupAdminStore();
-
     } else if (sec === 'settings') {
       const compInput = document.getElementById('settingsCompanyName');
       if (compInput) compInput.value = c.name;
@@ -168,12 +160,10 @@ async function showAdminSection(sec) {
       if (profileInput) profileInput.value = currentUser.name;
       loadCategories(c);
       setupAdminSettingsForms();
-      
       if (typeof window.setupAdminGamification === 'function') window.setupAdminGamification();
-      
     } else if (sec === 'delegar') {
       const catEl = document.getElementById('delegarCategoria');
-      if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); // <--- AQUI TAMBÉM
+      if (catEl) catEl.innerHTML = buildCategorySelectOptions(c.categories || defaultCategories); 
       setupAdminDelegarForm();
       loadTarefasEnviadas();
     }
@@ -184,7 +174,16 @@ async function showAdminSection(sec) {
     if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
         window.aplicarVisibilidadeGamificacao();
     }
-}, 200);
+  }, 200);
+  // Dentro da função que mostra as seções do Admin
+if (sec === 'settings') {
+  setTimeout(() => {
+      const check = document.getElementById('chkDarkMode');
+      if (check && currentUser) {
+          check.checked = currentUser.darkMode === true;
+      }
+  }, 200); // Aguarda o HTML carregar para marcar a chave
+}
 }
 
 window.refreshAdminDashboard = function () {
@@ -1886,12 +1885,10 @@ window.aprovarResgate = function(resgateId, preco) {
       
       // 3. Atualiza o status e SALVA o código PIN no banco
       db.collection('resgates').doc(resgateId.toString()).update({ 
-        status: 'aprovado', 
-        dataAprovacao: new Date().toISOString(),
-        pin_entrega: pinCode.trim() // <-- Mudei para pin_entrega para evitar conflitos!
-    }).then(() => {
-        showToast('Prémio entregue com sucesso!');
-        loadAdminRedemptions();
+          status: 'aprovado', 
+          dataAprovacao: new Date().toISOString(),
+          codigoResgate: pinCode.trim() // <-- Guardamos o PIN secreto aqui!
+      }).then(() => {
           
           // 4. Debita as moedas do Banco da Empresa (igual antes)
           db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {

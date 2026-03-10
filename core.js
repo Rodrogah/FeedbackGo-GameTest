@@ -85,46 +85,51 @@ db.collection('atividades').onSnapshot(
 
 function processAutoLogin() {
   const savedUserId = localStorage.getItem('feedbackgo_logged_user');
+  
   if (savedUserId) {
+    // Procura o usuário no array global carregado do Firebase
     const autoUser = users.find(
-      (u) => u.id === parseInt(savedUserId) && u.active
+      (u) => String(u.id) === String(savedUserId) && u.active
     );
+    
     if (autoUser) {
       currentUser = autoUser;
 
-      // Acende a bolinha verde de Online
-      db.collection('usuarios').doc(currentUser.id.toString()).update({ isOnline: true }).catch(()=>{});
-
-      // 🚀 REGISTO DIRETO: Não depende de outras funções carregarem primeiro
-      if (!sessionStorage.getItem('sessao_registrada')) {
-          const dataLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString();
-          
-          db.collection('acessos').add({
-              userId: currentUser.id,
-              companyId: currentUser.companyId,
-              userName: currentUser.name,
-              acao: 'LOGIN',
-              detalhes: 'Retornou ao sistema (Acesso automático)',
-              timestamp: dataLocal
-          }).then(() => {
-              sessionStorage.setItem('sessao_registrada', 'sim');
-          }).catch(err => console.error("Erro no auto-login:", err));
+      // === APLICA O MODO ESCURO SALVO NO BANCO ===
+      const prefEscuro = currentUser.darkMode === true;
+      if (typeof aplicarTemaInterface === 'function') {
+          aplicarTemaInterface(prefEscuro);
       }
 
-      // 🛡️ PROTEÇÃO: Só avança se a função visual existir
+      // REMOVE A CORTINA DE CARREGAMENTO
+      const splash = document.getElementById('splashLoadingGlobal');
+      if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(() => splash.remove(), 400);
+      }
+
+      // Atualiza status online
+      db.collection('usuarios').doc(currentUser.id.toString()).update({ isOnline: true }).catch(() => {});
+
+      // Abre o painel correto
       if (typeof showPanel === 'function') {
-        showPanel(autoUser.role);
-      } else {
-        setTimeout(() => { if(typeof showPanel === 'function') showPanel(autoUser.role); }, 500);
+          showPanel(currentUser.role);
       }
-      return;
-    } else {
-      localStorage.removeItem('feedbackgo_logged_user');
+      return; 
     }
   }
-  
-  if (typeof showLoginScreen === 'function') {
-    showLoginScreen();
+
+  // Se não houver login salvo, remove a cortina e mostra a tela de entrada
+  const splash = document.getElementById('splashLoadingGlobal');
+  if (splash) {
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 400);
+  }
+
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) {
+      loginScreen.style.display = 'flex';
+      loginScreen.classList.remove('hidden');
   }
 }
 
@@ -1210,3 +1215,30 @@ const observerTelas = new MutationObserver(() => aplicarVisibilidadeGamificacao(
 document.addEventListener("DOMContentLoaded", () => {
   observerTelas.observe(document.body, { childList: true, subtree: true });
 });
+
+// ============================================================
+// GESTÃO GLOBAL DE TEMA (DARK MODE) - SINCRONIZADO COM FIREBASE
+// ============================================================
+
+// 1. Função chamada pelo "onchange" da sua chave (Switch)
+window.alternarModoEscuro = function(event) {
+  const isDark = event.target.checked;
+  
+  // 1. Aplica e salva no navegador (ESSENCIAL PARA O F5)
+  if (isDark) {
+      document.body.classList.add('dark-mode');
+      localStorage.setItem('feedbackgo_dark_mode', 'true');
+  } else {
+      document.body.classList.remove('dark-mode');
+      localStorage.setItem('feedbackgo_dark_mode', 'false');
+  }
+
+  // 2. Salva no Firebase (Para outros dispositivos)
+  if (currentUser && currentUser.id) {
+      db.collection('usuarios').doc(currentUser.id.toString()).update({
+          darkMode: isDark
+      }).then(() => {
+          currentUser.darkMode = isDark;
+      });
+  }
+};

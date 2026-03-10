@@ -176,18 +176,15 @@ function showRecoverScreen() {
 }
 
 function showPanel(userOrRole) {
-  // 1. Esconde as telas de Login
   const loginScreen = document.getElementById('loginScreen');
   if (loginScreen) loginScreen.classList.add('hidden');
   
   const loginContainer = document.getElementById('login-container');
   if (loginContainer) loginContainer.style.display = 'none';
 
-  // 2. Acende a luz do App
   const appInterface = document.getElementById('app-interface');
   if (appInterface) appInterface.style.display = 'block';
 
-  // 3. Descobre o cargo
   let role = 'funcionario'; 
   if (typeof userOrRole === 'string') {
       role = userOrRole;
@@ -195,34 +192,33 @@ function showPanel(userOrRole) {
       role = userOrRole.role;
   } else if (typeof currentUser !== 'undefined' && currentUser) {
       role = currentUser.role;
+
+      // === APLICA O MODO ESCURO AO FAZER LOGIN MANUAL ===
+      if (currentUser.darkMode === true) {
+          document.body.classList.add('dark-mode');
+          localStorage.setItem('feedbackgo_dark_mode', 'true');
+      } else if (currentUser.darkMode === false) {
+          document.body.classList.remove('dark-mode');
+          localStorage.setItem('feedbackgo_dark_mode', 'false');
+      }
   }
 
   const pAdmin = document.getElementById('adminPanel');
   const pFunc = document.getElementById('employeePanel');
 
-  // 4. Esconde ambos primeiro usando a classe CSS
   if (pAdmin) pAdmin.classList.add('hidden');
   if (pFunc) pFunc.classList.add('hidden');
 
-  // 5. Mostra o painel correto com a MÁGICA DO F5!
-  if (role === 'admin') { 
-    if (pAdmin) pAdmin.classList.remove('hidden');
-    if (typeof initAdminPanel === 'function') initAdminPanel();
-    
-  } else if (role === 'funcionario') {
-    if (pFunc) pFunc.classList.remove('hidden');
-    if (typeof initEmployeePanel === 'function') initEmployeePanel();
-    
-  } else if (role === 'hibrido') {
-    // === LÊ A MEMÓRIA PARA SABER QUAL A "ROUPA" QUE ESTAVA A USAR ===
-    const modoSalvo = localStorage.getItem('feedbackgo_modo_hibrido') || 'admin';
-    
-    if (modoSalvo === 'funcionario') {
-        if (pFunc) pFunc.classList.remove('hidden');
-        if (typeof initEmployeePanel === 'function') initEmployeePanel();
-    } else {
-        if (pAdmin) pAdmin.classList.remove('hidden');
-        if (typeof initAdminPanel === 'function') initAdminPanel();
-    }
+  let painelFinal = role;
+  if (role === 'hibrido') {
+      painelFinal = localStorage.getItem('feedbackgo_modo_hibrido') || 'admin';
+  }
+
+  if (painelFinal === 'admin') { 
+      if (pAdmin) pAdmin.classList.remove('hidden');
+      if (typeof initAdminPanel === 'function') initAdminPanel(localStorage.getItem('feedbackgo_aba_admin'));
+  } else {
+      if (pFunc) pFunc.classList.remove('hidden');
+      if (typeof initEmployeePanel === 'function') initEmployeePanel(localStorage.getItem('feedbackgo_aba_func'));
   }
 }

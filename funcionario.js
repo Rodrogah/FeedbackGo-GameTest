@@ -1,179 +1,166 @@
 // ============ MOTOR DE NAVEGAÇÃO DO FUNCIONÁRIO ============
 async function showEmployeeSection(sec) {
-  localStorage.setItem('feedbackgo_ultimaAbaFuncionario', sec);
-  const palco = document.getElementById('funcConteudoDinamico'); 
-  if (!palco) return console.error('Erro fatal: funcConteudoDinamico não existe!');
-
-  document.querySelectorAll('#employeePanel .nav-item').forEach((i) => i.classList.remove('active'));
-  const activeNav = document.querySelector(`#employeePanel .nav-item[onclick*="${sec}"]`);
-  if (activeNav) activeNav.classList.add('active');
-
-  palco.style.transition = 'opacity 0.2s ease';
-  palco.style.opacity = '0';
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  palco.innerHTML = '<div style="text-align:center; padding:50px; opacity: 0.4;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i></div>';
-  palco.style.opacity = '1';
-
-  try {
-    const rotas = {
-      dashboard: 'func-dashboard.html',
-      'new-task': 'func-nova-atividade.html',
-      history: 'func-historico.html',
-      settings: 'func-configuracoes.html',
-      'tarefas-recebidas': 'func-tarefas-recebidas.html',
-      store: 'func-loja.html',
-      resgates: 'func-resgates.html' 
-};
-    
-    const resposta = await fetch(`./telas/${rotas[sec]}`);
-    if (!resposta.ok) throw new Error('Erro de fetch: Ficheiro não encontrado.');
-    
-    palco.innerHTML = await resposta.text();
-    palco.classList.remove('fade-entrar');
-    void palco.offsetWidth; 
-    palco.classList.add('fade-entrar');
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-
-    const c = companies.find((x) => x.id === currentUser.companyId);
-
-    if (sec === 'dashboard') {
-      const greet = document.getElementById('employeeGreeting');
-      if (greet) greet.textContent = `Olá, ${currentUser.name.split(' ')[0]}!`;
-      // Apenas atualiza a data e chama o gatilho geral!
-      updateCurrentDate('currentDate');
-      if (typeof window.refreshFuncDashboard === 'function') window.refreshFuncDashboard();
-      
-      if (typeof window.atualizarPainelGamificacao === 'function') {
-          window.atualizarPainelGamificacao();
-      }
-      
-      if (typeof window.renderRankingMensal === 'function') {
-          window.renderRankingMensal('rankingFuncContainer');
-      }
-
-      // 🚀 ADICIONE ESTA LINHA AQUI! (Dispara a verificação dos prémios pendentes)
-      if (typeof window.verificarRecompensasPendentes === 'function') {
-          window.verificarRecompensasPendentes();
-      }
-
-    } else if (sec === 'new-task') {
-      
-      // 1. Preenche a data de hoje automaticamente
-      if (typeof setTodayDate === 'function') setTodayDate('taskDate');
-      
-      // 2. Traz as categorias da empresa
-      const catEl = document.getElementById('taskCategory');
-      if (catEl && c) {
-          catEl.innerHTML = '<option value="" disabled selected>Selecione a categoria...</option>' + 
-             (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
-      }
-      
-      // 3. LIGA O BOTÃO DE GUARDAR!
-      setupNewTaskForm();
-
-    } else if (sec === 'history') {
-      const catEl = document.getElementById('empFilterCategory');
-      if (catEl && c) {
-          catEl.innerHTML = '<option value="">Todas as Categorias</option>' + 
-              (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
-      }
-      loadEmployeeHistory();
-
-    } else if (sec === 'settings') {
-      const profileInput = document.getElementById('empProfileName');
-      if (profileInput) profileInput.value = currentUser.name;
-      setupFuncSettingsForms();
-
-      // 🔥 O GATILHO QUE FALTAVA: Manda desenhar o avatar assim que a página abre!
-      if (typeof window.carregarPerfilEAvatarFunc === 'function') {
-          setTimeout(window.carregarPerfilEAvatarFunc, 150);
-      }
-
-    } else if (sec === 'tarefas-recebidas') {
-      setupFuncionarioTarefas();
-
-    } else if (sec === 'store') {
-      if (typeof setupFuncStore === 'function') {
-          setupFuncStore();
-          setTimeout(loadFuncRedemptions, 200); // Carrega a tabela de PINs
-      }
-
-    } else if (sec === 'resgates') {
-      // Pequeno delay para garantir que o HTML carregou antes de buscar os dados
-      setTimeout(() => {
-          if (typeof window.loadFuncRedemptions === 'function') window.loadFuncRedemptions();
-      }, 150);
-    }
-
-  } catch (err) {
-    palco.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
-  }
-  // Verifica a chave mestra da empresa
-  const c = companies.find((x) => x.id === currentUser.companyId);
-  const isGamiAtiva = c && c.gamificationEnabled === true;
-
-  // 1. Oculta ou exibe o Menu da Loja
-  const menuLojaFunc = document.querySelector('#employeePanel .nav-item[onclick*="store"]');
-  if (menuLojaFunc) menuLojaFunc.style.display = isGamiAtiva ? 'flex' : 'none';
-
-  // 2. Se for o Dashboard, oculta ou exibe as barras e o ranking
-  if (sec === 'dashboard') {
-      setTimeout(() => {
-          const barraXp = document.getElementById('xpProgressBar');
-          if (barraXp) barraXp.closest('.card').style.display = isGamiAtiva ? 'flex' : 'none';
-          
-          const rankingFunc = document.getElementById('rankingFuncContainer');
-          if (rankingFunc) rankingFunc.parentElement.style.display = isGamiAtiva ? 'block' : 'none';
-      }, 150);
-  }
-  setTimeout(() => {
-    if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
-        window.aplicarVisibilidadeGamificacao();
-    }
-}, 200);
-}
-
-function initEmployeePanel() {
-  const c = companies.find((x) => x.id === currentUser.companyId);
-  if (!c) return;
+    const palco = document.getElementById('funcConteudoDinamico'); 
+    if (!palco) return console.error('Erro fatal: funcConteudoDinamico não existe!');
   
-  document.getElementById('empCompanySidebar').textContent = c.name;
-  document.getElementById('sidebarEmployeeName').textContent = currentUser.name.split(' ')[0];
-  document.getElementById('employeeTeamName').textContent = currentUser.team || 'Membro';
-
-  const sideAvatar = document.getElementById('employeeAvatar');
-  if (sideAvatar) {
-      if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
-          sideAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
-      } else {
-          sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+    // 🛡️ LIMPEZA
+    sec = String(sec).replace(/['"]/g, '').trim();
+    if (sec === 'null' || sec === 'undefined' || sec === '') sec = 'dashboard';
+    localStorage.setItem('feedbackgo_aba_func', sec);
+  
+    try {
+        document.querySelectorAll('#employeePanel .nav-item').forEach((i) => i.classList.remove('active'));
+        const activeNav = document.querySelector(`#employeePanel .nav-item[onclick*="${sec}"]`);
+        if (activeNav) activeNav.classList.add('active');
+    } catch(e) {}
+  
+    palco.style.transition = 'opacity 0.2s ease';
+    palco.style.opacity = '0';
+    await new Promise(resolve => setTimeout(resolve, 200));
+  
+    palco.innerHTML = '<div style="text-align:center; padding:50px; opacity: 0.4;"><i class="fa-solid fa-circle-notch fa-spin fa-2x"></i></div>';
+    palco.style.opacity = '1';
+  
+    try {
+      const rotas = {
+        dashboard: 'func-dashboard.html',
+        'new-task': 'func-nova-atividade.html',
+        history: 'func-historico.html',
+        settings: 'func-configuracoes.html',
+        'tarefas-recebidas': 'func-tarefas-recebidas.html',
+        store: 'func-loja.html',
+        resgates: 'func-resgates.html' 
+      };
+      
+      if (!rotas[sec]) sec = 'dashboard';
+  
+      const resposta = await fetch(`./telas/${rotas[sec]}`);
+      if (!resposta.ok) throw new Error('Erro de fetch: Ficheiro não encontrado.');
+      
+      palco.innerHTML = await resposta.text();
+      palco.classList.remove('fade-entrar');
+      void palco.offsetWidth; 
+      palco.classList.add('fade-entrar');
+      window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  
+      const c = companies.find((x) => String(x.id) === String(currentUser.companyId));
+  
+      if (sec === 'dashboard') {
+        const greet = document.getElementById('employeeGreeting');
+        if (greet) greet.textContent = `Olá, ${currentUser.name.split(' ')[0]}!`;
+        updateCurrentDate('currentDate');
+        if (typeof window.refreshFuncDashboard === 'function') window.refreshFuncDashboard();
+        if (typeof window.atualizarPainelGamificacao === 'function') window.atualizarPainelGamificacao();
+        if (typeof window.renderRankingMensal === 'function') window.renderRankingMensal('rankingFuncContainer');
+        if (typeof window.verificarRecompensasPendentes === 'function') window.verificarRecompensasPendentes();
+  
+      } else if (sec === 'new-task') {
+        if (typeof setTodayDate === 'function') setTodayDate('taskDate');
+        const catEl = document.getElementById('taskCategory');
+        if (catEl && c) {
+            catEl.innerHTML = '<option value="" disabled selected>Selecione a categoria...</option>' + 
+               (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
+        }
+        setupNewTaskForm();
+  
+      } else if (sec === 'history') {
+        const catEl = document.getElementById('empFilterCategory');
+        if (catEl && c) {
+            catEl.innerHTML = '<option value="">Todas as Categorias</option>' + 
+                (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
+        }
+        loadEmployeeHistory();
+  
+      } else if (sec === 'settings') {
+        const profileInput = document.getElementById('empProfileName');
+        if (profileInput) profileInput.value = currentUser.name;
+        setupFuncSettingsForms();
+        if (typeof window.carregarPerfilEAvatarFunc === 'function') setTimeout(window.carregarPerfilEAvatarFunc, 150);
+  
+      } else if (sec === 'tarefas-recebidas') {
+        setupFuncionarioTarefas();
+  
+      } else if (sec === 'store') {
+        if (typeof setupFuncStore === 'function') {
+            setupFuncStore();
+            setTimeout(loadFuncRedemptions, 200); 
+        }
+  
+      } else if (sec === 'resgates') {
+        setTimeout(() => {
+            if (typeof window.loadFuncRedemptions === 'function') window.loadFuncRedemptions();
+        }, 150);
       }
+  
+    } catch (err) {
+      palco.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+    }
+    
+    const c = companies.find((x) => String(x.id) === String(currentUser.companyId));
+    const isGamiAtiva = c && c.gamificationEnabled === true;
+  
+    const menuLojaFunc = document.querySelector('#employeePanel .nav-item[onclick*="store"]');
+    if (menuLojaFunc) menuLojaFunc.style.display = isGamiAtiva ? 'flex' : 'none';
+  
+    if (sec === 'dashboard') {
+        setTimeout(() => {
+            const barraXp = document.getElementById('xpProgressBar');
+            if (barraXp) barraXp.closest('.card').style.display = isGamiAtiva ? 'flex' : 'none';
+            
+            const rankingFunc = document.getElementById('rankingFuncContainer');
+            if (rankingFunc) rankingFunc.parentElement.style.display = isGamiAtiva ? 'block' : 'none';
+        }, 150);
+    }
+    setTimeout(() => {
+      if (typeof window.aplicarVisibilidadeGamificacao === 'function') {
+          window.aplicarVisibilidadeGamificacao();
+      }
+    }, 200);
   }
 
-  // Injeta o botão para voltar ao modo Admin
-  if (currentUser.role === 'hibrido') {
-    let btnBox = document.getElementById('boxSwitchToAdmin');
-    if (!btnBox) {
-        const nav = document.querySelector('#employeePanel .sidebar-nav');
-        if(nav) {
-            nav.insertAdjacentHTML('afterbegin', `
-              <div id="boxSwitchToAdmin" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #1e293b; padding-left: 12px; padding-right: 12px; padding-top: 5px;">
-                  <button onclick="alternarVisaoHibrida('admin')" class="btn" style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); width: 100%; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.2);">
-                      <i class="fa-solid fa-crown"></i> Modo Admin
-                  </button>
-              </div>
-            `);
+function initEmployeePanel(abaForcada = null) {
+    const c = companies.find((x) => String(x.id) === String(currentUser.companyId));
+    if (!c) return;
+    
+    document.getElementById('empCompanySidebar').textContent = c.name;
+    document.getElementById('sidebarEmployeeName').textContent = currentUser.name.split(' ')[0];
+    document.getElementById('employeeTeamName').textContent = currentUser.team || 'Membro';
+  
+    const sideAvatar = document.getElementById('employeeAvatar');
+    if (sideAvatar) {
+        if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
+            sideAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+        } else {
+            sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
         }
     }
-}
-
- // RECUPERA A ABA OU VAI PARA O DASHBOARD SE FOR A PRIMEIRA VEZ
- const ultimaAba = localStorage.getItem('feedbackgo_ultimaAbaFuncionario') || 'dashboard';
- showEmployeeSection(ultimaAba);
- 
- setTimeout(runAutoCleanup, 5000);
-}
+  
+    if (currentUser.role === 'hibrido') {
+      let btnBox = document.getElementById('boxSwitchToAdmin');
+      if (!btnBox) {
+          const nav = document.querySelector('#employeePanel .sidebar-nav');
+          if(nav) {
+              nav.insertAdjacentHTML('afterbegin', `
+                <div id="boxSwitchToAdmin" style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #1e293b; padding-left: 12px; padding-right: 12px; padding-top: 5px;">
+                    <button onclick="alternarVisaoHibrida('admin')" class="btn" style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); width: 100%; border-radius: 8px; font-size: 13px; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.2);">
+                        <i class="fa-solid fa-crown"></i> Modo Admin
+                    </button>
+                </div>
+              `);
+          }
+      }
+    }
+  
+    // 🛡️ MÁGICA DA BLINDAGEM NO FUNCIONÁRIO
+    let abaParaAbrir = abaForcada || localStorage.getItem('feedbackgo_aba_func') || 'dashboard';
+    abaParaAbrir = String(abaParaAbrir).replace(/['"]/g, '').trim(); 
+    if (abaParaAbrir === 'null' || abaParaAbrir === 'undefined' || abaParaAbrir === '') {
+        abaParaAbrir = 'dashboard';
+    }
+  
+    showEmployeeSection(abaParaAbrir);
+    setTimeout(runAutoCleanup, 5000);
+  }
 
 // ==========================================
 // MÓDULO POWER BI - FUNCIONÁRIO
@@ -1313,7 +1300,7 @@ window.verificarRecompensasPendentes = function() {
                       </div>
                       <div>
                           <h3 style="margin: 0 0 4px 0; font-size: 18px; color: white;">Parabéns! Ficaste no Top ${minhaPosicaoIndex + 1} de ${nomeDoMes}!</h3>
-                          <p style="margin: 0; font-size: 14px; opacity: 0.9;">O teu esforço foi recompensado. Resgata o teu prêmio do pódio.</p>
+                          <p style="margin: 0; font-size: 14px; opacity: 0.9;">O teu esforço foi recompensado. Resgata o teu prémio do pódio.</p>
                       </div>
                   </div>
                   <button onclick="resgatarPremioDoRanking('${mes}', ${premioMoedas})" style="background: white; color: #d97706; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: 0.2s; min-width: 160px;">
@@ -1372,118 +1359,65 @@ window.resgatarPremioDoRanking = function(mesId, valorMoedas) {
 // SISTEMA DE RESGATES E PIN (FUNCIONÁRIO)
 // ==========================================
 
-window.verMeuCodigoSecreto = function(codigo) {
-    if (!codigo || codigo === "undefined" || codigo === "") {
-        return alert('Aguarde: O gestor ainda não inseriu o código deste prémio.');
+window.verCodigoResgate = function(codigo) {
+    // Se o código vier como 'undefined' ou vazio, avisamos o user
+    if (!codigo || codigo === 'undefined' || codigo === '') {
+        return showToast('O código ainda não foi inserido pelo gestor.', 'error');
     }
 
-    // 1. Cria o fundo escuro (overlay)
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    overlay.style.zIndex = '99999';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-
-    // 2. Cria a janela
-    const modal = document.createElement('div');
-    modal.style.background = 'var(--color-bg-primary, #ffffff)';
-    modal.style.padding = '30px';
-    modal.style.borderRadius = '16px';
-    modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-    modal.style.textAlign = 'center';
-    modal.style.maxWidth = '350px';
-    modal.style.width = '90%';
-
-    // 3. O visual (Agora com um ID na caixinha verde e um texto de aviso invisível)
-    modal.innerHTML = `
-        <h3 style="margin-top: 0; color: var(--color-text-primary, #1e293b); font-size: 22px; display: flex; justify-content: center; align-items: center; gap: 10px;">
-            <i class="fa-solid fa-gift" style="color: #10b981;"></i> Prémio Disponível!
-        </h3>
-        <p style="color: var(--color-text-secondary, #64748b); margin-bottom: 20px; font-size: 14px;">
-            Clica na caixa abaixo para copiar o teu PIN:
-        </p>
-        
-        <div id="caixaPinCopiar" style="background: #ecfdf5; border: 2px dashed #10b981; padding: 20px; border-radius: 8px; font-size: 24px; font-weight: 900; color: #059669; letter-spacing: 2px; cursor: pointer; user-select: none; margin-bottom: 5px; transition: all 0.3s ease;" title="Clica para copiar!">
-            ${codigo}
-        </div>
-        
-        <p id="msgCopiado" style="color: #10b981; font-size: 13px; font-weight: bold; margin-top: 0; margin-bottom: 20px; opacity: 0; transition: opacity 0.3s ease; height: 15px;">
-            <i class="fa-solid fa-check-double"></i> Copiado com sucesso!
-        </p>
-
-        <button id="btnFecharMeuPin" style="background: var(--color-primary, #6366f1); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; transition: 0.2s;">
-            Fechar
-        </button>
-    `;
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    // 4. A MÁGICA: Evento de clique na caixa verde
-    document.getElementById('caixaPinCopiar').addEventListener('click', function() {
-        // Usa a API do navegador para copiar o texto invisível
-        navigator.clipboard.writeText(codigo).then(() => {
-            // Efeito visual: A caixa fica toda verde e o texto branco
-            this.style.background = '#10b981';
-            this.style.color = '#ffffff';
-            
-            // Mostra o texto "Copiado com sucesso!"
-            document.getElementById('msgCopiado').style.opacity = '1';
-
-            // Depois de 1.5 segundos, volta tudo ao normal para ele ver o código de novo
-            setTimeout(() => {
-                this.style.background = '#ecfdf5';
-                this.style.color = '#059669';
-                document.getElementById('msgCopiado').style.opacity = '0';
-            }, 1500);
-        }).catch(err => {
-            console.error('Erro ao copiar: ', err);
-        });
-    });
-
-    // 5. Botão de Fechar
-    document.getElementById('btnFecharMeuPin').addEventListener('click', () => {
-        document.body.removeChild(overlay);
-    });
+    showConfirm(
+        `<div style="text-align: center; margin-top: 10px;">
+            <p style="font-size: 14px; margin-bottom: 15px; color: var(--color-text-secondary);">Copia o teu código abaixo:</p>
+            <div style="background: rgba(16, 185, 129, 0.1); border: 2px dashed var(--color-primary); padding: 15px; border-radius: 8px; font-size: 22px; font-weight: 900; color: var(--color-primary); user-select: all; cursor: pointer;">
+                ${codigo}
+            </div>
+        </div>`,
+        () => { /* fechar */ },
+        '🎁 O Teu Prémio Chegou!'
+    );
 };
 
-// Função para desenhar a tabela
 window.loadFuncRedemptions = function() {
-    const box = document.getElementById('listaMeusResgates');
-    if (!box) return;
+    const container = document.getElementById('listaMeusResgates');
+    if (!container) return;
 
-    db.collection('resgates').where('userId', '==', currentUser.id).get().then(snap => {
+    container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> A carregar...</div>';
+
+    db.collection('resgates')
+      .where('userId', '==', currentUser.id)
+      .get()
+      .then(snap => {
         if (snap.empty) {
-            box.innerHTML = '<p style="padding:20px; opacity:0.5; text-align:center;">Nenhum resgate encontrado.</p>';
+            container.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.6;">Ainda não tens resgates feitos.</div>';
             return;
         }
 
-        let tabela = `<div style="overflow-x:auto;"><table>
-            <thead><tr><th>Data</th><th>Item</th><th>PIN / Status</th></tr></thead>
-            <tbody>`;
+        let html = '<div class="table-container"><table><thead><tr><th>Data</th><th>Prémio</th><th>Coins</th><th>Status / PIN</th></tr></thead><tbody>';
 
         snap.forEach(doc => {
             const r = doc.data();
-            const dataF = new Date(r.createdAt).toLocaleDateString('pt-BR');
+            const dataP = new Date(r.createdAt).toLocaleDateString('pt-BR');
             
-            let acao = '';
-            if (r.status === 'aprovado') {
-                // Passamos o PIN direto para a função window
-                acao = `<button class="btn btn-small" onclick="window.verMeuCodigoSecreto('${r.pin_entrega || ""}')" style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">VER PIN</button>`;
+            let acaoHtml = '';
+            if (r.status === 'pendente') {
+                acaoHtml = '<span class="badge" style="background:#fef9c3; color:#ca8a04;">Pendente</span>';
+            } else if (r.status === 'aprovado') {
+                // Aqui garantimos que o PIN é passado corretamente, mesmo que seja antigo
+                const pinSeguro = r.codigoResgate || r.pin || ''; 
+                
+                acaoHtml = `<button class="btn btn-small" 
+                    style="background:var(--color-primary); color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;" 
+                    onclick="window.verCodigoResgate('${pinSeguro}')">
+                    <i class="fa-solid fa-gift"></i> Ver PIN
+                </button>`;
             } else {
-                acao = `<span style="font-size:12px; opacity:0.6;">${r.status.toUpperCase()}</span>`;
+                acaoHtml = '<span class="badge" style="background:#fee2e2; color:#dc2626;">Recusado</span>';
             }
 
-            tabela += `<tr><td>${dataF}</td><td><b>${r.premioNome}</b></td><td>${acao}</td></tr>`;
+            html += `<tr><td>${dataP}</td><td><strong>${r.premioNome}</strong></td><td>${r.preco}</td><td>${acaoHtml}</td></tr>`;
         });
 
-        tabela += '</tbody></table></div>';
-        box.innerHTML = tabela;
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
     });
 };

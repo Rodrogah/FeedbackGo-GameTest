@@ -55,6 +55,25 @@ setTimeout(function() {
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+
+    <script>
+      // SCRIPT DE EMERGÊNCIA: Aplica o tema antes mesmo da página carregar
+      (function() {
+        const temaSalvo = localStorage.getItem('feedbackgo_dark_mode');
+        if (temaSalvo === 'true') {
+          document.body.classList.add('dark-mode');
+        }
+      })();
+    </script>
+
+    <div id="splashLoadingGlobal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--color-bg-primary); z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s ease;">
+      <div style="background: rgba(16, 185, 129, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+          <i class="fa-solid fa-paper-plane fa-bounce" style="font-size: 32px; color: var(--color-primary);"></i>
+      </div>
+      <h2 style="color: var(--color-text-primary); font-size: 20px; font-weight: 700;">FeedbackGo</h2>
+      <p style="color: var(--color-text-secondary); font-size: 14px; margin-top: 5px;">A carregar o seu ambiente de trabalho...</p>
+  </div>
+
     <div id="editModal" class="modal-overlay hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -278,7 +297,7 @@ setTimeout(function() {
       </div>
     </div>
 
-    <div id="loginScreen" class="login-container">
+    <div id="loginScreen" class="login-container" style="display: none;">
       <div class="login-card">
         <div class="logo">
           <div class="logo-icon"><i class="fa-solid fa-paper-plane"></i></div>
