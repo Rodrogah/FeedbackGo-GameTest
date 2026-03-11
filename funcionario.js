@@ -567,28 +567,44 @@ async function showEmployeeSection(sec) {
       const tituloFinal = document.getElementById('entregarTitulo').value; 
   
       const finalizarParaRevisao = (anexosNovos) => {
-          db.collection('tarefas').doc(tarefaId.toString()).update({ 
-              status: 'em_revisao',
-              respostaFuncionario: observacoes,
-              tituloEntrega: tituloFinal,
-              attachments: anexosNovos 
-          }).then(() => {
-              if (window.registrarAcao) {
-                  window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'ENTREGAR_TAREFA', `Enviou a tarefa para revisão: ${tituloFinal}`);
-              }
-              showToast('Entregue! Aguardando avaliação.');
-              fecharModalTarefa();
-              fileListDisplay.innerHTML = '';
-              arquivosSelecionados = [];
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              loadTarefasRecebidas(); 
-          }).catch(err => {
-              showToast('Erro ao entregar.', 'error');
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-          });
-      };
+        db.collection('tarefas').doc(tarefaId.toString()).update({ 
+            status: 'em_revisao',
+            respostaFuncionario: observacoes,
+            tituloEntrega: tituloFinal,
+            attachments: anexosNovos 
+        }).then(() => {
+            if (window.registrarAcao) {
+                window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'ENTREGAR_TAREFA', `Enviou a tarefa para revisão: ${tituloFinal}`);
+            }
+
+            // 🔥 GATILHO: AVISA O GESTOR QUE A TAREFA FOI ENTREGUE
+            db.collection('tarefas').doc(tarefaId.toString()).get().then(docTarefa => {
+                const donoDaTarefa = docTarefa.data().senderId;
+                if (donoDaTarefa) {
+                    db.collection('notificacoes').add({
+                        userId: donoDaTarefa,
+                        titulo: '📩 Tarefa Entregue!',
+                        mensagem: `${currentUser.name} enviou a tarefa "${tituloFinal}" para a sua avaliação.`,
+                        createdAt: new Date().toISOString(),
+                        acaoAlvo: 'delegar',
+                        lida: false
+                    });
+                }
+            });
+
+            showToast('Entregue! Aguardando avaliação.');
+            fecharModalTarefa();
+            fileListDisplay.innerHTML = '';
+            arquivosSelecionados = [];
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            loadTarefasRecebidas(); 
+        }).catch(err => {
+            showToast('Erro ao entregar.', 'error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+    };
   
       if (arquivosSelecionados.length > 0) {
           const promessas = arquivosSelecionados.map((file) => {
@@ -994,6 +1010,21 @@ window.solicitarResgateGiftCard = async function(cardId) {
             };
 
             await db.collection('resgates').doc(String(novoResgate.id)).set(novoResgate);
+
+            // 🔥 GATILHO: AVISA TODOS OS ADMINS SOBRE O PEDIDO DE GIFT CARD
+            db.collection('usuarios').where('companyId', '==', c.id).where('role', '==', 'admin').get().then(snap => {
+                snap.forEach(adminDoc => {
+                    db.collection('notificacoes').add({
+                        userId: adminDoc.data().id,
+                        titulo: '🛍️ Novo Pedido na Loja!',
+                        mensagem: `${currentUser.name} solicitou o resgate de: ${nomePremio}.`,
+                        createdAt: new Date().toISOString(),
+                        acaoAlvo: 'store',
+                        lida: false
+                    });
+                });
+            });
+
             showToast('🎉 Pedido realizado! Aguarde o PIN.', 'success');
             setupFuncStore(); 
 
@@ -1055,6 +1086,21 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
             };
 
             await db.collection('resgates').doc(String(novoResgate.id)).set(novoResgate);
+
+            // 🔥 GATILHO: AVISA TODOS OS ADMINS SOBRE O PEDIDO INTERNO
+            db.collection('usuarios').where('companyId', '==', currentUser.companyId).where('role', '==', 'admin').get().then(snap => {
+                snap.forEach(adminDoc => {
+                    db.collection('notificacoes').add({
+                        userId: adminDoc.data().id,
+                        titulo: '⭐ Resgate de Prêmio Interno!',
+                        mensagem: `${currentUser.name} resgatou: ${nomePremio}.`,
+                        createdAt: new Date().toISOString(),
+                        acaoAlvo: 'store',
+                        lida: false
+                    });
+                });
+            });
+
             showToast('🎉 Pedido realizado com sucesso!', 'success');
             setupFuncStore(); 
 
@@ -1082,7 +1128,7 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
                 ${codigo}
             </div>
         </div>`,
-        () => { }, '🎁 O Seu Prémio Chegou!'
+        () => { }, '🎁 O Seu Prêmio Chegou!'
     );
   };
   
@@ -1098,7 +1144,7 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
             return;
         }
   
-        let html = '<div class="table-container"><table><thead><tr><th>Data</th><th>Prémio</th><th>Coins</th><th>Status / Ação</th></tr></thead><tbody>';
+        let html = '<div class="table-container"><table><thead><tr><th>Data</th><th>Prêmio</th><th>Coins</th><th>Status / Ação</th></tr></thead><tbody>';
         let lista = [];
         snap.forEach(doc => lista.push(doc.data()));
         lista.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -1378,7 +1424,7 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
   
       if (typeof atualizarPainelGamificacao === 'function') atualizarPainelGamificacao();
   }).catch(err => {
-      showToast('Erro ao resgatar prémio.', 'error');
+      showToast('Erro ao resgatar prêmio.', 'error');
       btn.innerHTML = `RESGATAR <i class="fa-solid fa-coins"></i> ${valorMoedas}`;
       btn.disabled = false;
   });

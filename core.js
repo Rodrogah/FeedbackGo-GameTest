@@ -1036,19 +1036,35 @@ window.solicitarPermissaoNotificacao = function() {
 window.iniciarRadarNotificacoes = function() {
   if (!currentUser) return;
 
-  // Pega a hora exata do login para não apitar notificações velhas
-  const agora = new Date().toISOString();
+  // Guarda a hora exata do login (em milissegundos)
+  const horaLogin = new Date().getTime();
+  let primeiraLeitura = true;
 
+  // Tiramos o ">= createdAt" para não quebrar o Firebase sem índice
   db.collection('notificacoes')
     .where('userId', '==', currentUser.id)
-    .where('createdAt', '>=', agora) // Só ouve o que chegar DEPOIS de logar
     .onSnapshot(snap => {
+        
+        // Se for a primeira vez que a página carrega, apenas ignora as antigas
+        if (primeiraLeitura) {
+            primeiraLeitura = false;
+            return;
+        }
+
+        // Nas próximas vezes, se algo for ADICIONADO, ele lê
         snap.docChanges().forEach(change => {
             if (change.type === 'added') {
                 const notif = change.doc.data();
-                dispararNotificacaoNativa(notif.titulo, notif.mensagem);
+                const horaNotificacao = new Date(notif.createdAt).getTime();
+                
+                // Só apita se a notificação foi criada AGORA (depois do login)
+                if (horaNotificacao > horaLogin) {
+                    dispararNotificacaoNativa(notif.titulo, notif.mensagem);
+                }
             }
         });
+    }, err => {
+        console.error("Erro no radar de notificações:", err);
     });
 };
 
@@ -1071,4 +1087,242 @@ window.dispararNotificacaoNativa = function(titulo, mensagem) {
       // Se ele não autorizou o push do celular, mostra pelo menos o Toast verde na tela
       showToast(`🔔 ${titulo}: ${mensagem}`, 'success');
   }
+};
+
+// =======================================================
+// MOTOR DE NOTIFICAÇÕES NATIVAS, SININHO E DEEP LINKING
+// =======================================================
+
+window.todasNotificacoesCache = []; // Guarda a lista completa em memória
+
+window.solicitarPermissaoNotificacao = function() {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "denied" && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+};
+
+window.dispararNotificacaoNativa = function(titulo, mensagem, acaoAlvo, notifId) {
+  if (Notification.permission === "granted") {
+    const n = new Notification(titulo, {
+      body: mensagem,
+      icon: 'icon-512.png', // O seu logo
+      vibrate: [200, 100, 200] 
+  });
+      n.onclick = function() { 
+          window.focus(); 
+          n.close(); 
+          // 🔥 NOVO: Passa o ID da notificação para o Roteador!
+          if(acaoAlvo) window.abrirAbaPelaNotificacao(acaoAlvo, notifId); 
+      };
+  } else {
+      showToast(`🔔 ${titulo}: ${mensagem}`, 'success');
+  }
+};
+
+// Navegação Inteligente (Deep Linking) Blindada + Marca como Lida
+window.abrirAbaPelaNotificacao = function(alvo, notifId) {
+  // 🔥 NOVO: Se tivermos o ID, marcamos a notificação como lida no banco de dados
+  if (notifId && notifId !== 'undefined' && notifId !== 'null') {
+      db.collection('notificacoes').doc(String(notifId)).update({ lida: true }).catch(e => console.error("Erro ao marcar lida:", e));
+  }
+
+  // 1. Se for uma notificação antiga, avisa na tela e não tenta navegar
+  if (!alvo || alvo === 'undefined' || alvo === 'null') {
+      if (typeof showToast === 'function') showToast('Esta notificação é antiga e não possui atalho.', 'warning');
+      return;
+  }
+  
+  // 2. Fecha menus abertos para limpar a tela
+  document.querySelectorAll('.notifDropdown').forEach(d => d.style.display = 'none');
+
+  // 3. Verifica o cargo e joga para a tela correta
+  const modoAtual = currentUser.role === 'hibrido' ? localStorage.getItem('feedbackgo_modo_hibrido') : currentUser.role;
+  
+  try {
+      if (modoAtual === 'admin') {
+          if (typeof showAdminSection === 'function') showAdminSection(alvo);
+      } else {
+          if (typeof showEmployeeSection === 'function') showEmployeeSection(alvo);
+      }
+  } catch(e) {
+      console.error("Erro ao redirecionar:", e);
+  }
+};
+
+window.construirSininhoUI = function() {
+  if (document.querySelector('.notificationBox')) return; 
+
+  const notifHTML = `
+  <style>
+      .notif-scroll-hidden::-webkit-scrollbar { display: none; }
+      .notif-scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+      .notif-item-hover:hover { background: rgba(0,0,0,0.05) !important; }
+      .dark-mode .notif-item-hover:hover { background: rgba(255,255,255,0.05) !important; }
+  </style>
+  
+  <div class="notificationBox" style="position: absolute; right: 15px; top: 15px; z-index: 999;">
+      <button onclick="toggleNotifMenu(this)" style="background: transparent; border: none; width: 40px; height: 40px; cursor: pointer; position: relative; color: var(--color-text-secondary); transition: 0.2s;">
+          <i class="fa-solid fa-bell" style="font-size: 22px;"></i>
+          <span class="notifBadge" style="position: absolute; top: 0px; right: 0px; background: var(--color-danger); color: white; font-size: 10px; font-weight: bold; width: 18px; height: 18px; border-radius: 50%; display: none; align-items: center; justify-content: center; border: 2px solid var(--color-bg-secondary); box-shadow: 0 2px 5px rgba(0,0,0,0.2);">0</span>
+      </button>
+      
+      <div class="notifDropdown" style="display: none; position: absolute; bottom: 50px; left: 0px; width: 320px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 -10px 30px rgba(0,0,0,0.3); flex-direction: column; overflow: hidden;">
+          <div style="padding: 15px; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; background: var(--color-bg-secondary); z-index: 2;">
+              <h4 style="margin: 0; font-size: 15px;"><i class="fa-solid fa-bell" style="color: var(--color-primary);"></i> Notificações</h4>
+              <button onclick="marcarNotificacoesComoLidas()" style="background: transparent; border: none; color: var(--color-primary); font-size: 12px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;">Marcar Lidas</button>
+          </div>
+          
+          <div class="notifList notif-scroll-hidden" style="display: flex; flex-direction: column; max-height: 400px; overflow-y: auto;">
+              <p style="padding: 20px; text-align: center; opacity: 0.6; font-size: 13px;">A carregar dados...</p>
+          </div>
+      </div>
+  </div>`;
+  
+  const footers = document.querySelectorAll('.sidebar-footer');
+  footers.forEach(footer => {
+      footer.style.position = 'relative'; 
+      footer.insertAdjacentHTML('beforeend', notifHTML);
+  });
+
+  document.addEventListener('click', (e) => {
+      if (!e.target.closest('.notificationBox')) {
+          document.querySelectorAll('.notifDropdown').forEach(drop => drop.style.display = 'none');
+      }
+  });
+};
+
+window.iniciarRadarNotificacoes = function() {
+  if (!currentUser) return;
+
+  construirSininhoUI(); 
+  const horaLogin = new Date().getTime();
+  let primeiraLeitura = true;
+
+  db.collection('notificacoes')
+    .where('userId', '==', currentUser.id)
+    .onSnapshot(snap => {
+        let lista = [];
+        let naoLidas = 0;
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            data.id = doc.id; // Garante que temos o ID do documento!
+            lista.push(data);
+            if (data.lida !== true) naoLidas++;
+        });
+
+        window.todasNotificacoesGlobais = lista.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        document.querySelectorAll('.notifBadge').forEach(badge => {
+            badge.innerText = naoLidas;
+            badge.style.display = naoLidas > 0 ? 'flex' : 'none';
+        });
+
+        let htmlLista = '';
+        if (window.todasNotificacoesGlobais.length === 0) {
+            htmlLista = '<p style="padding: 30px 20px; text-align: center; opacity: 0.5; font-size: 13px; margin:0;"><i class="fa-regular fa-bell" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>Sem novas mensagens.</p>';
+        } else {
+            htmlLista = window.todasNotificacoesGlobais.map(n => {
+                const cursorStyle = n.acaoAlvo ? 'cursor: pointer;' : 'cursor: default;';
+                const hoverClass = n.acaoAlvo ? 'notif-item-hover' : '';
+                return `
+                <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${n.acaoAlvo}', '${n.id}')" style="padding: 15px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s;">
+                    <div style="font-size: 10px; color: var(--color-text-secondary); margin-bottom: 5px;">${new Date(n.createdAt).toLocaleString('pt-BR')}</div>
+                    <strong style="font-size: 13px; display: block; margin-bottom: 4px; color: var(--color-text-primary);">${n.titulo}</strong>
+                    <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4;">${n.mensagem}</p>
+                </div>`;
+            }).join('');
+        }
+
+        document.querySelectorAll('.notifList').forEach(listContainer => {
+            listContainer.innerHTML = htmlLista;
+        });
+
+        if (!primeiraLeitura) {
+            snap.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const notif = change.doc.data();
+                    const horaNotificacao = new Date(notif.createdAt).getTime();
+                    if (horaNotificacao > horaLogin) {
+                        // 🔥 NOVO: Passa o ID no momento do popup (change.doc.id)
+                        dispararNotificacaoNativa(notif.titulo, notif.mensagem, notif.acaoAlvo, change.doc.id);
+                    }
+                }
+            });
+        }
+        primeiraLeitura = false;
+    }, err => console.error(err));
+};
+
+window.abrirModalTodasNotificacoes = function() {
+  document.querySelectorAll('.notifDropdown').forEach(drop => drop.style.display = 'none');
+  if (document.getElementById('modalTodasNotificacoes')) return;
+
+  // 🔥 O ESCUDO PROTETOR: Se a lista global não estiver pronta, assume uma lista vazia ([])
+  const listaGlobal = window.todasNotificacoesGlobais || [];
+  
+  let listaHTML = '';
+  
+  // Agora o .length nunca vai falhar
+  if (listaGlobal.length === 0) {
+      listaHTML = '<div style="padding: 40px; text-align: center; opacity: 0.5;"><i class="fa-regular fa-bell-slash" style="font-size: 40px; margin-bottom: 15px;"></i><p>A sua caixa de entrada está limpa.</p></div>';
+  } else {
+      listaHTML = listaGlobal.map(n => {
+          const cursorStyle = n.acaoAlvo ? 'cursor: pointer;' : 'cursor: default;';
+          const hoverClass = n.acaoAlvo ? 'notif-item-hover' : '';
+          return `
+          <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${n.acaoAlvo}')" style="padding: 15px 20px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s; display: flex; align-items: flex-start; gap: 15px;">
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: ${n.lida ? 'transparent' : 'var(--color-primary)'}; margin-top: 6px; flex-shrink: 0;"></div>
+              <div style="flex-grow: 1;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                      <strong style="font-size: 14px; color: var(--color-text-primary);">${n.titulo}</strong>
+                      <span style="font-size: 11px; color: var(--color-text-secondary); opacity: 0.8;">${new Date(n.createdAt).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <p style="margin: 0; font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">${n.mensagem}</p>
+              </div>
+          </div>`;
+      }).join('');
+  }
+
+  const overlayHTML = `
+      <div id="modalTodasNotificacoes" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.6); z-index: 999999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+          <div class="modal-content" style="width: 90%; max-width: 500px; height: 80vh; max-height: 700px; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: var(--color-bg-primary); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+              <div class="modal-header" style="padding: 20px 25px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-secondary); position: relative;">
+                  <h2 style="margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px;"><i class="fa-solid fa-inbox" style="color: var(--color-primary);"></i> Histórico Completo</h2>
+                  <button onclick="document.getElementById('modalTodasNotificacoes').remove()" style="position: absolute; right: 20px; top: 15px; font-size: 24px; background: transparent; border: none; color: var(--color-text-secondary); cursor: pointer; transition: 0.2s;">&times;</button>
+              </div>
+              <div class="notif-scroll-hidden" style="overflow-y: auto; flex-grow: 1; padding-bottom: 20px;">
+                  ${listaHTML}
+              </div>
+          </div>
+      </div>
+      <style>
+          .notif-item-hover:hover { background: rgba(0,0,0,0.05) !important; }
+          .dark-mode .notif-item-hover:hover { background: rgba(255,255,255,0.05) !important; }
+      </style>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', overlayHTML);
+};
+
+window.toggleNotifMenu = function(btn) {
+    const drop = btn.nextElementSibling;
+    const isHidden = drop.style.display === 'none';
+    document.querySelectorAll('.notifDropdown').forEach(d => d.style.display = 'none');
+    if (isHidden) drop.style.display = 'flex';
+};
+
+window.marcarNotificacoesComoLidas = function() {
+    db.collection('notificacoes').where('userId', '==', currentUser.id).get().then(snap => {
+        const batch = db.batch();
+        let contador = 0;
+        snap.forEach(doc => {
+            if (doc.data().lida !== true) {
+                batch.update(doc.ref, { lida: true });
+                contador++;
+            }
+        });
+        if(contador > 0) batch.commit();
+    });
 };

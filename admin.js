@@ -113,7 +113,6 @@ async function showAdminSection(sec) {
       store: 'admin-loja.html'
     };
 
-    // Se a rota for inválida, força o dashboard para não crachar
     if (!rotas[sec]) sec = 'dashboard';
 
     const resposta = await fetch(`./telas/${rotas[sec]}`);
@@ -216,11 +215,9 @@ window.saveAnnouncement = function () {
     });
 };
 
-// Memória dos cliques nos gráficos
 window.dashActiveStatus = null;
 window.dashActiveCategory = null;
 
-// Função para a Borracha limpar TUDO (Selects + Gráficos)
 window.clearAllDashFilters = function() {
     document.getElementById('dashFilterTeam').value = '';
     document.getElementById('dashFilterUser').value = '';
@@ -232,7 +229,6 @@ window.clearAllDashFilters = function() {
     refreshAdminDashboard();
 };
 
-// O Motor atualizado: Agora aceita ignorar uma regra para não "sumir" com o próprio gráfico
 function getFilteredDashboardData(ignoreStatus = false, ignoreCategory = false) {
     const team = document.getElementById('dashFilterTeam')?.value;
     const user = document.getElementById('dashFilterUser')?.value;
@@ -251,7 +247,6 @@ function getFilteredDashboardData(ignoreStatus = false, ignoreCategory = false) 
     if (startDate) f = f.filter(a => a.date >= startDate);
     if (endDate) f = f.filter(a => a.date <= endDate);
     
-    // Filtros dos cliques nos gráficos
     if (!ignoreCategory && window.dashActiveCategory) {
         f = f.filter(a => a.category === window.dashActiveCategory);
     }
@@ -261,9 +256,8 @@ function getFilteredDashboardData(ignoreStatus = false, ignoreCategory = false) 
     return f;
 }
 
-// Atualizar os cards de números
 function updateAdminStats() {
-    const filtered = getFilteredDashboardData(); // Pega com TODOS os filtros aplicados
+    const filtered = getFilteredDashboardData();
     
     const elHoje = document.getElementById('adminTodayTasks');
     const elMes = document.getElementById('adminMonthTasks');
@@ -277,22 +271,19 @@ function updateAdminStats() {
     if (elTotal) elTotal.textContent = filtered.length;
 }
 
-// Atualizar Tabela Recente
 function loadAdminRecentActivities() {
   const el = document.getElementById('adminRecentActivities');
   if (!el) return;
-  const lista = getFilteredDashboardData() // Usa todos os filtros
+  const lista = getFilteredDashboardData()
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 8);
   el.innerHTML = generateActivityTableHTML(lista, true);
 }
 
-// 2. Função de Refresh à prova de erros
 window.refreshAdminDashboard = function () {
   const c = companies.find((x) => x.id === currentUser.companyId);
   if (!c) return;
 
-  // Proteção: Preenche os selects apenas se existirem na tela
   const userSelect = document.getElementById('dashFilterUser');
   if (userSelect && userSelect.options.length <= 1) {
       userSelect.innerHTML = '<option value="">Todos Usuários</option>' + 
@@ -306,7 +297,6 @@ window.refreshAdminDashboard = function () {
           (c.categories || defaultCategories).map(cat => `<option value="${cat}">${cat}</option>`).join('');
   }
 
-  // Atualiza tudo de uma vez
   updateAdminStats();
   loadAdminRecentActivities();
   if (typeof renderAdminCharts === 'function') renderAdminCharts();
@@ -322,10 +312,6 @@ window.renderAdminCharts = function () {
   const textColor = isDark ? '#f8fafc' : '#1e293b';
   const gridColor = isDark ? '#334155' : '#e2e8f0';
 
-  // ==========================================
-    // 1. GRÁFICO DE STATUS (Pizza)
-    // Ignoramos o status nele mesmo para mostrar as outras fatias apagadas
-    // ==========================================
     const actsForStatus = getFilteredDashboardData(true, false);
     const ctxStatus = document.getElementById('adminStatusChart');
     if (ctxStatus) {
@@ -336,10 +322,7 @@ window.renderAdminCharts = function () {
             else if (a.status === 'pendente') pend++;
         });
 
-        // Ordem Fixa: 0=Concluído, 1=Andamento, 2=Pendente
         const statusMap = ['concluido', 'andamento', 'pendente'];
-        
-        // Cores correspondentes: Verde, Amarelo, Vermelho
         const activeColors = isDark 
             ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)'] 
             : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)'];
@@ -348,7 +331,6 @@ window.renderAdminCharts = function () {
             ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)']
             : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)'];
 
-        // Aplica o efeito visual (Borracha / Selecionado)
         const bgStatus = statusMap.map((st, i) => {
             if (!window.dashActiveStatus) return activeColors[i];
             return window.dashActiveStatus === st ? activeColors[i] : inactiveColors[i];
@@ -358,10 +340,10 @@ window.renderAdminCharts = function () {
         adminStatusChartInstance = new Chart(ctxStatus, {
             type: 'doughnut',
             data: {
-                labels: ['Concluído', 'Em Andamento', 'Pendente'], // Legenda
+                labels: ['Concluído', 'Em Andamento', 'Pendente'],
                 datasets: [{
-                    data: [conc, and, pend], // Dados na mesma ordem
-                    backgroundColor: bgStatus, // Cores na mesma ordem
+                    data: [conc, and, pend], 
+                    backgroundColor: bgStatus, 
                     borderWidth: 2,
                     borderColor: isDark ? '#1e293b' : '#ffffff',
                 }],
@@ -380,10 +362,6 @@ window.renderAdminCharts = function () {
         });
     }
 
-  // ==========================================
-  // 2. GRÁFICO DE CATEGORIA (Barras)
-  // Ignora a própria categoria para o gráfico não sumir, apenas destaca
-  // ==========================================
   const actsForCategory = getFilteredDashboardData(false, true);
   const ctxCategory = document.getElementById('adminCategoryChart');
   if (ctxCategory) {
@@ -395,7 +373,6 @@ window.renderAdminCharts = function () {
       const labels = Object.keys(catCounts);
       const data = Object.values(catCounts);
 
-      // Lógica de transparência nas barras
       const bgColors = labels.map((cat) => {
           const hue = typeof getCategoryHue === 'function' ? getCategoryHue(cat) : 200;
           const isActive = !window.dashActiveCategory || window.dashActiveCategory === cat;
@@ -433,10 +410,6 @@ window.renderAdminCharts = function () {
       });
   }
 
-  // ==========================================
-  // 3. GRÁFICO DE LINHA DO TEMPO
-  // Este reflete TUDO, se clicar numa categoria, mostra a linha do tempo SÓ daquela categoria
-  // ==========================================
   const actsTimeline = getFilteredDashboardData(); 
   const ctxTimeline = document.getElementById('adminTimelineChart');
   if (ctxTimeline) {
@@ -482,14 +455,14 @@ let currentAdminPage = 1;
 let currentAdminFilteredActs = [];
 
 function loadAllActivities() {
-  currentAdminPage = 1; // Reseta para a página 1 ao abrir o ecrã
+  currentAdminPage = 1;
   applyAdminFilters(1); 
 }
 
 function populateAdminFilters(c) {
   const tEl = document.getElementById('admFilterTeam');
   const uEl = document.getElementById('adminFilterUser');
-  const cEl = document.getElementById('admFilterCategory'); // NOVO
+  const cEl = document.getElementById('admFilterCategory'); 
   if (tEl)
     tEl.innerHTML = '<option value="">Todas as Equipes</option>' + (c.teams || []).map((t) => `<option value="${t}">${t}</option>`).join('');
   if (uEl)
@@ -504,8 +477,8 @@ window.applyAdminFilters = function (page = 1) {
   const t = document.getElementById('admFilterTeam') ? document.getElementById('admFilterTeam').value : '';
   const uId = document.getElementById('adminFilterUser') ? document.getElementById('adminFilterUser').value : '';
   const s = document.getElementById('adminFilterStartDate') ? document.getElementById('adminFilterStartDate').value : '';
-  const cat = document.getElementById('admFilterCategory') ? document.getElementById('admFilterCategory').value : ''; // NOVO
-  const search = document.getElementById('admFilterSearch') ? document.getElementById('admFilterSearch').value.toLowerCase().trim() : ''; // NOVO
+  const cat = document.getElementById('admFilterCategory') ? document.getElementById('admFilterCategory').value : ''; 
+  const search = document.getElementById('admFilterSearch') ? document.getElementById('admFilterSearch').value.toLowerCase().trim() : ''; 
   
   const ordemEl = document.getElementById('ordemHistorico');
   const ordemEscolhida = ordemEl ? ordemEl.value : 'desc';
@@ -546,16 +519,14 @@ window.getFilteredReportData = function () {
   const s = document.getElementById('reportStartDate') ? document.getElementById('reportStartDate').value : '';
   const e = document.getElementById('reportEndDate') ? document.getElementById('reportEndDate').value : '';
   
-  // CAPTURA AS NOVAS CAIXAS
   const cat = document.getElementById('reportFilterCategory') ? document.getElementById('reportFilterCategory').value : ''; 
   const search = document.getElementById('reportFilterSearch') ? document.getElementById('reportFilterSearch').value.toLowerCase().trim() : ''; 
   
   let f = activities.filter((a) => a.companyId === currentUser.companyId);
   
-  // APLICA OS FILTROS
   if (s) f = f.filter((a) => a.date >= s);
   if (e) f = f.filter((a) => a.date <= e);
-  if (cat) f = f.filter((a) => a.category === cat); // FILTRA CATEGORIA AQUI!
+  if (cat) f = f.filter((a) => a.category === cat); 
   if (search) {
       f = f.filter((a) => 
           (a.title && a.title.toLowerCase().includes(search)) || 
@@ -569,12 +540,10 @@ window.getFilteredReportData = function () {
   }
   if (uId) f = f.filter((a) => a.userId === parseInt(uId));
   
-  // Sempre Mais Novo -> Mais Antigo na Tela
   return f.sort((a, b) => {
     const dataA = a.date || '';
     const dataB = b.date || '';
 
-    // Desempate por hora se forem do mesmo dia
     if (dataA === dataB) {
         const tempoA = new Date(a.createdAt || 0).getTime();
         const tempoB = new Date(b.createdAt || 0).getTime();
@@ -589,20 +558,17 @@ window.renderAdminHistoryPage = function() {
   const el = document.getElementById('adminActivitiesTable');
   if (!el) return;
 
-  const itemsPerPage = 20; // 20 Itens por página
+  const itemsPerPage = 20; 
   const totalPages = Math.ceil(currentAdminFilteredActs.length / itemsPerPage) || 1;
   
   if (currentAdminPage > totalPages) currentAdminPage = totalPages;
   if (currentAdminPage < 1) currentAdminPage = 1;
 
-  // Fatiar a lista para pegar apenas os 20 da página atual
   const start = (currentAdminPage - 1) * itemsPerPage;
   const actsPage = currentAdminFilteredActs.slice(start, start + itemsPerPage);
 
-  // Gerar a tabela com a "fatia"
   let html = generateActivityTableHTML(actsPage, true);
 
-  // Adicionar controlos de paginação no final da tabela
   if (totalPages > 1) {
       html += `
       <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 25px; padding: 10px;">
@@ -621,7 +587,7 @@ window.renderAdminHistoryPage = function() {
   el.innerHTML = html;
 };
 
-window.unsubscribeUsersTable = null; // Guarda o radar para não duplicar
+window.unsubscribeUsersTable = null; 
 
 window.loadUsersTable = function() {
   const el = document.getElementById('usersTable');
@@ -650,7 +616,6 @@ window.loadUsersTable = function() {
                   ? `<span title="Online agora" style="display:inline-block; width:12px; height:12px; background-color:#10b981; border-radius:50%; box-shadow: 0 0 6px #10b981;"></span>` 
                   : `<span title="Offline" style="display:inline-block; width:12px; height:12px; background-color:#64748b; border-radius:50%;"></span>`;
 
-              // 🔥 AS ETIQUETAS DOS CARGOS
               let badgeRole = '';
               if (u.role === 'admin') badgeRole = '<span class="badge" style="background:#EDE9FE;color:#7C3AED; margin-left: 5px;">Admin</span>';
               if (u.role === 'hibrido') badgeRole = '<span class="badge" style="background:#fef08a;color:#a16207; margin-left: 5px;"><i class="fa-solid fa-bolt"></i> Híbrido</span>';
@@ -711,7 +676,7 @@ window.loadCategories = function(c) {
   let groups = {};
   
   (c.categories || []).forEach((cat, i) => {
-      let g = "Outros"; // Rede de segurança para categorias sem grupo
+      let g = "Outros"; 
       let sub = cat;
       
       if(cat.includes('::')) {
@@ -828,7 +793,6 @@ function setupAdminNewTaskForm() {
       atividadeFinal.id = nextActivityId;
       db.collection('atividades').doc(atividadeFinal.id.toString()).set(atividadeFinal).then(() => {
           
-          // 🚀 ESPIÃO: REGISTRA A ATIVIDADE CRIADA PELO ADMIN
           if (window.registrarAcao) {
               window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'CRIAR_ATIVIDADE', `Registrou a atividade: ${atividadeFinal.title}`);
           }
@@ -919,7 +883,6 @@ function setupNewTeamForm() {
 }
 
 function setupAdminSettingsForms() {
-  // 1. Aponta para o NOVO ID do formulário de categorias
   const catForm = document.getElementById('formNovaCategoria'); 
   if (catForm) {
     catForm.addEventListener('submit', function (e) {
@@ -927,7 +890,6 @@ function setupAdminSettingsForms() {
       const grupo = document.getElementById('newCategoryGroup').value.trim();
       const sub = document.getElementById('newCategoryName').value.trim();
       
-      // Cria o texto agrupado "Grupo :: Sub"
       const n = grupo + " :: " + sub;
 
       let c = companies.find((x) => x.id === currentUser.companyId);
@@ -940,7 +902,6 @@ function setupAdminSettingsForms() {
           .update({ categories: c.categories })
           .then(() => {
             document.getElementById('newCategoryName').value = '';
-            // Não apaga o grupo para facilitar o cadastro em lote
             loadCategories(c);
             showToast('Subcategoria adicionada!');
           });
@@ -950,7 +911,6 @@ function setupAdminSettingsForms() {
     });
   }
 
-  // 2. Formulário de Perfil do Administrador (Mantido igual)
   const profForm = document.getElementById('admProfileForm');
   if (profForm) {
     profForm.addEventListener('submit', function (e) {
@@ -981,7 +941,6 @@ function setupAdminSettingsForms() {
   }
 }
 
-// ============ NAVEGAÇÃO DE CONFIGURAÇÕES (CORRIGIDA) ============
 window.openSettingsTab = function (tabId, btnElement) {
   document.querySelectorAll('.settings-tab-content').forEach((tab) => {
       tab.style.display = 'none';
@@ -996,7 +955,6 @@ window.openSettingsTab = function (tabId, btnElement) {
   if (activeTab) activeTab.style.display = 'block';
   if (btnElement) btnElement.classList.add('active');
 
-  // 🔥 GATILHO: Garante que o avatar carrega assim que clica na aba
   if (tabId === 'tabPerfil' && typeof window.carregarPerfilEAvatar === 'function') {
       setTimeout(window.carregarPerfilEAvatar, 50); 
   }
@@ -1114,7 +1072,6 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
   const novoForm = form.cloneNode(true);
   form.parentNode.replaceChild(novoForm, form);
 
-  // 🎮 INJETA O CAMPO DE DIFICULDADE (GAMIFICAÇÃO)
   const areaArquivos = novoForm.querySelector('.file-drop-area');
   if (areaArquivos && !document.getElementById('boxDificuldadeGamificacao')) {
       const c = companies.find(x => x.id === currentUser.companyId);
@@ -1123,9 +1080,9 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
       const formGroupArquivos = areaArquivos.parentNode;
       const divDif = document.createElement('div');
       divDif.className = 'form-group';
-      divDif.id = 'boxDificuldadeGamificacao'; // ID adicionado para controle
+      divDif.id = 'boxDificuldadeGamificacao'; 
       divDif.style.marginTop = "15px";
-      divDif.style.display = isGamiAtiva ? 'block' : 'none'; // Esconde se estiver desativado!
+      divDif.style.display = isGamiAtiva ? 'block' : 'none'; 
       
       divDif.innerHTML = `
           <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
@@ -1184,7 +1141,6 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
       const descricao = document.getElementById('delegarDescricao').value;
       const categoria = document.getElementById('delegarCategoria').value;
       
-      // Captura o peso, mas se não achar usa 3 por padrão
       const difSelect = document.getElementById('delegarDificuldade');
       const dificuldade = difSelect ? parseInt(difSelect.value) : 3;
       const dataAtual = new Date().toISOString();
@@ -1211,6 +1167,16 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
               };
 
               promessasFirebase.push(db.collection('tarefas').doc(tarefaId.toString()).set(novaTarefa));
+              
+              // 🔥 GATILHO DA NOTIFICAÇÃO DE NOVA TAREFA COM REDIRECIONAMENTO
+              promessasFirebase.push(db.collection('notificacoes').add({
+                  userId: userId,
+                  titulo: '🎯 Nova Tarefa!',
+                  mensagem: `Você recebeu a tarefa: ${titulo}`,
+                  createdAt: dataAtual,
+                  acaoAlvo: 'tarefas-recebidas',
+                  lida: false
+              }));
           });
 
           Promise.all(promessasFirebase).then(() => {
@@ -1258,7 +1224,6 @@ window.aprovarTarefaRevisao = function() {
           
           const regras = dataEmpresa.gamificacao || { xpBase: 50, xpNivel: 500, coinsNivel: 100, pesoFacil: 2, pesoMedia: 3, pesoDificil: 4 };
 
-          // Se estiver desativada, ganha 0 pontos. Se não, faz a conta.
           let xpGanho = 0;
           if (gamificacaoAtiva) {
               let peso = regras.pesoMedia;
@@ -1274,7 +1239,6 @@ window.aprovarTarefaRevisao = function() {
               status: 'concluido', xpEarned: xpGanho, tarefaVinculadaId: idT
           });
 
-          // Se estiver desativada, simplesmente não mexe na conta do usuário
           let p3 = Promise.resolve();
           if (gamificacaoAtiva) {
               p3 = db.collection('usuarios').doc(t.userId.toString()).get().then(uSnap => {
@@ -1292,6 +1256,17 @@ window.aprovarTarefaRevisao = function() {
 
           Promise.all([p1, p2, p3]).then(() => {
               const msg = gamificacaoAtiva ? `Aprovado! +${xpGanho} XP enviados.` : `Tarefa aprovada e concluída com sucesso!`;
+              
+              // 🔥 GATILHO DA NOTIFICAÇÃO DE APROVAÇÃO COM REDIRECIONAMENTO
+              db.collection('notificacoes').add({
+                  userId: t.userId,
+                  titulo: gamificacaoAtiva ? '🏆 Tarefa Concluída!' : '✅ Tarefa Aprovada',
+                  mensagem: gamificacaoAtiva ? `Excelente trabalho! Você ganhou +${xpGanho} de XP.` : `A sua tarefa "${t.title}" foi aprovada.`,
+                  createdAt: new Date().toISOString(),
+                  acaoAlvo: 'history',
+                  lida: false
+              });
+
               showToast(msg);
               fecharDetalhesTarefa();
               loadTarefasEnviadas();
@@ -1400,10 +1375,7 @@ window.apagarTarefaDelegada = function(idTarefa) {
   showConfirm(
       'Tem a certeza que deseja apagar esta tarefa? Se ela já estiver concluída, também será apagada do Histórico de Relatórios.',
       () => {
-          // 1. Apaga a tarefa da aba "Delegar Tarefas"
           const p1 = db.collection('tarefas').doc(idTarefa.toString()).delete();
-          
-          // 2. Procura a atividade "casada" no Histórico e apaga-a também (se existir)
           const p2 = db.collection('atividades').where('tarefaVinculadaId', '==', idTarefa.toString()).get()
               .then(snapshot => {
                   const batch = db.batch();
@@ -1432,7 +1404,6 @@ window.apagarTarefaDelegada = function(idTarefa) {
 // ==========================================
 let arquivosFeedbackSelecionados = [];
 
-// Escutador para quando o Admin seleciona ficheiros na revisão
 document.addEventListener('change', function(e) {
     if(e.target && e.target.id === 'adminFeedbackArquivos') {
         const files = Array.from(e.target.files);
@@ -1450,7 +1421,6 @@ document.addEventListener('change', function(e) {
     }
 });
 
-// A função que devolve a tarefa com anexos
 window.reprovarTarefaRevisao = function() {
     const idTarefa = document.getElementById('detalhesTarefaId').value;
     const feedback = document.getElementById('adminFeedbackRevisao').value.trim();
@@ -1466,10 +1436,22 @@ window.reprovarTarefaRevisao = function() {
         db.collection('tarefas').doc(idTarefa.toString()).update({ 
             status: 'pendente', 
             feedbackAdmin: feedback,
-            feedbackAttachments: anexosFeedback // Salva os novos anexos aqui!
+            feedbackAttachments: anexosFeedback 
         }).then(() => {
+            
+            // 🔥 GATILHO DA NOTIFICAÇÃO DE DEVOLUÇÃO COM REDIRECIONAMENTO
+            db.collection('tarefas').doc(idTarefa.toString()).get().then(doc => {
+                db.collection('notificacoes').add({
+                    userId: doc.data().userId,
+                    titulo: '⚠️ Tarefa Devolvida',
+                    mensagem: `O Gestor deixou feedback na tarefa "${doc.data().title}". Por favor, verificar.`,
+                    createdAt: new Date().toISOString(),
+                    acaoAlvo: 'tarefas-recebidas',
+                    lida: false
+                });
+            });
+
             showToast('Tarefa devolvida com sucesso!', 'error');
-            // Limpa o formulário
             document.getElementById('adminFeedbackRevisao').value = '';
             arquivosFeedbackSelecionados = [];
             document.getElementById('adminFeedbackArquivosLista').innerHTML = '';
@@ -1486,7 +1468,6 @@ window.reprovarTarefaRevisao = function() {
         });
     };
 
-    // Lê os arquivos (se houver) e converte para enviar
     if (arquivosFeedbackSelecionados.length > 0) {
         const promessas = arquivosFeedbackSelecionados.map((file) => {
             return new Promise((resolve) => {
@@ -1508,12 +1489,11 @@ window.abrirEditarTarefa = function(id) {
       document.getElementById('editDelegarTitulo').value = t.title;
       document.getElementById('editDelegarDescricao').value = t.description;
       
-      // Carrega as categorias na hora de editar
       const c = companies.find((x) => x.id === currentUser.companyId);
       const catEl = document.getElementById('editDelegarCategoria');
       if (catEl && c) {
           catEl.innerHTML = (c.categories || defaultCategories).map((cat) => `<option value="${cat}">${cat}</option>`).join('');
-          catEl.value = t.category || 'Geral'; // Seleciona a categoria atual da tarefa
+          catEl.value = t.category || 'Geral'; 
       }
 
       document.getElementById('modalEditarTarefaDelegada').classList.remove('hidden');
@@ -1545,12 +1525,10 @@ window.salvarEdicaoTarefa = function() {
 // CONTROLE DAS ABAS E EXCLUSÃO (ADMIN DELEGAR)
 // ==========================================
 window.openDelegarTab = function(tabId, btn) {
-  // 1. Esconde todos os conteúdos das abas
   document.querySelectorAll('.delegar-tab-content').forEach(tab => {
       tab.style.display = 'none';
   });
   
-  // 2. Tira o visual de "selecionado" de todos os botões
   document.querySelectorAll('.nav-delegar-tab').forEach(b => {
       b.style.background = 'transparent';
       b.style.color = 'var(--color-text-secondary)';
@@ -1558,16 +1536,13 @@ window.openDelegarTab = function(tabId, btn) {
       b.classList.remove('active');
   });
 
-  // 3. Mostra o conteúdo da aba correta
   document.getElementById(tabId).style.display = 'block';
 
-  // 4. Pinta o botão clicado com a cor principal
   btn.style.background = 'var(--color-primary)';
   btn.style.color = 'white';
   btn.style.border = '1px solid var(--color-primary)';
   btn.classList.add('active');
 
-  // 5. Se for a aba de enviadas, atualiza a tabela na hora
   if(tabId === 'tabTarefasEnviadas') {
       loadTarefasEnviadas();
   }
@@ -1583,7 +1558,6 @@ window.abrirModalAcessos = function(userId) {
   document.getElementById('nomeUsuarioAcesso').textContent = u.name;
   document.getElementById('userIdAcessoAtual').value = userId;
   
-  // Define a data de HOJE considerando o fuso horário local
   const hojeLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
   document.getElementById('filtroDataAcessos').value = hojeLocal;
   
@@ -1603,10 +1577,8 @@ window.carregarAcessos = function(userId, dataFiltro) {
     const container = document.getElementById('listaAcessosUsuario');
     container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando histórico ao vivo...</div>';
     
-    // Desliga o radar anterior para não misturar dados
     if (window.unsubscribeAcessos) window.unsubscribeAcessos();
 
-    // 🚀 O RADAR: Escuta as ações em TEMPO REAL
     window.unsubscribeAcessos = db.collection('acessos')
       .where('userId', '==', userId)
       .onSnapshot(snap => {
@@ -1666,7 +1638,6 @@ window.carregarAcessos = function(userId, dataFiltro) {
 
 window.fecharModalAcessos = function() {
     document.getElementById('modalAcessos').classList.add('hidden');
-    // Desliga o radar ao fechar a janela para economizar internet/banco
     if (window.unsubscribeAcessos) {
         window.unsubscribeAcessos();
         window.unsubscribeAcessos = null;
@@ -1677,7 +1648,6 @@ window.fecharModalAcessos = function() {
 // LOJA DE RECOMPENSAS (VISÃO DO GESTOR)
 // =======================================================
 
-// 1. Controle das Abas Internas (Catálogo / Pedidos)
 window.openStoreTab = function(tabId, btn) {
   document.querySelectorAll('.store-section').forEach(el => el.style.display = 'none');
   document.getElementById(tabId).style.display = 'block';
@@ -1689,9 +1659,8 @@ window.openStoreTab = function(tabId, btn) {
   if (tabId === 'tabResgates') loadAdminRedemptions();
 };
 
-// 2. Inicializador da Loja e Cadastro de Prémios
 window.setupAdminStore = function() {
-  loadAdminRewards(); // Carrega a lista ao abrir o ecrã
+  loadAdminRewards();
 
   const form = document.getElementById('adminNewRewardForm');
   if (!form) return;
@@ -1716,20 +1685,19 @@ window.setupAdminStore = function() {
       };
 
       db.collection('premios').doc(premio.id.toString()).set(premio).then(() => {
-          showToast('Prémio adicionado ao catálogo!');
+          showToast('Prêmio adicionado ao catálogo!');
           novoForm.reset();
           loadAdminRewards();
           btn.innerHTML = originalText;
           btn.disabled = false;
       }).catch(err => {
-          showToast('Erro ao guardar prémio', 'error');
+          showToast('Erro ao guardar prêmio', 'error');
           btn.innerHTML = originalText;
           btn.disabled = false;
       });
   });
 };
 
-// 3. Renderizar o Catálogo de Prémios
 window.loadAdminRewards = function() {
   const container = document.getElementById('adminRewardsList');
   if (!container) return;
@@ -1737,11 +1705,10 @@ window.loadAdminRewards = function() {
 
   db.collection('premios').where('companyId', '==', currentUser.companyId).get().then(snap => {
       if (snap.empty) {
-          container.innerHTML = '<div style="padding:15px; text-align:center; opacity:0.6;">Nenhum prémio cadastrado no seu cofre.</div>';
+          container.innerHTML = '<div style="padding:15px; text-align:center; opacity:0.6;">Nenhum prêmio cadastrado no seu cofre.</div>';
           return;
       }
       
-      // Ordena para que os mais baratos apareçam primeiro
       let premios = [];
       snap.forEach(doc => premios.push(doc.data()));
       premios.sort((a, b) => a.preco - b.preco);
@@ -1774,15 +1741,14 @@ window.togglePremioStatus = function(id, status) {
 };
 
 window.excluirPremio = function(id) {
-  if(confirm("Tem a certeza que deseja excluir este prémio permanentemente?")) {
+  if(confirm("Tem a certeza que deseja excluir este prêmio permanentemente?")) {
       db.collection('premios').doc(id.toString()).delete().then(() => {
-          showToast('Prémio excluído!');
+          showToast('Prêmio excluído!');
           loadAdminRewards();
       });
   }
 };
 
-// 4. Renderizar e Gerir Pedidos de Resgate
 window.loadAdminRedemptions = function() {
   const container = document.getElementById('adminRedemptionList');
   if (!container) return;
@@ -1821,7 +1787,6 @@ window.loadAdminRedemptions = function() {
 };
 
 window.aprovarResgate = function(resgateId, preco) {
-  // 1. Cria um modal customizado injetado na tela para substituir o prompt() nativo
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.style.zIndex = '999999';
@@ -1844,22 +1809,20 @@ window.aprovarResgate = function(resgateId, preco) {
   `;
   
   document.body.appendChild(overlay);
-  document.getElementById('adminPinInput').focus(); // Já foca no campo de texto para colar
+  document.getElementById('adminPinInput').focus(); 
   
-  // 2. Ação do botão de Confirmar (No admin.js)
-    document.getElementById('btnConfirmarPin').addEventListener('click', () => {
-        const pinCode = document.getElementById('adminPinInput').value.trim();
-        
-        if (!pinCode) {
-            return showToast('Insira um código válido para entregar!', 'warning');
-        }
-        
-        const btn = document.getElementById('btnConfirmarPin');
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
-        btn.disabled = true;
-        
-        // Salva o PIN e aprova a compra
-        db.collection('resgates').doc(resgateId.toString()).update({ 
+  document.getElementById('btnConfirmarPin').addEventListener('click', () => {
+      const pinCode = document.getElementById('adminPinInput').value.trim();
+      
+      if (!pinCode) {
+          return showToast('Insira um código válido para entregar!', 'warning');
+      }
+      
+      const btn = document.getElementById('btnConfirmarPin');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+      btn.disabled = true;
+      
+      db.collection('resgates').doc(resgateId.toString()).update({ 
           status: 'aprovado', 
           dataAprovacao: new Date().toISOString(),
           codigoResgate: pinCode 
@@ -1868,16 +1831,18 @@ window.aprovarResgate = function(resgateId, preco) {
               let bank = docEmpresa.data().companyBank || 0;
               db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
                   
-                  // 🔥 NOVO: DISPARA A NOTIFICAÇÃO PARA O CELULAR DO FUNCIONÁRIO
+                  // 🔥 GATILHO DA NOTIFICAÇÃO DE PIN ENTREGUE COM REDIRECIONAMENTO
                   db.collection('resgates').doc(resgateId.toString()).get().then(docResgate => {
                       const donoDoResgate = docResgate.data().userId;
                       const nomeDoPremio = docResgate.data().premioNome;
                       
                       db.collection('notificacoes').add({
                           userId: donoDoResgate,
-                          titulo: '🎁 O seu prémio chegou!',
-                          mensagem: `O PIN do seu ${nomeDoPremio} já está disponível na sua conta!`,
-                          createdAt: new Date().toISOString()
+                          titulo: '🎁 O Seu prêmio chegou!',
+                          mensagem: `O Seu Gift Card ${nomeDoPremio} já está disponível!`,
+                          createdAt: new Date().toISOString(),
+                          acaoAlvo: 'resgates',
+                          lida: false
                       });
                   });
 
@@ -1892,10 +1857,10 @@ window.aprovarResgate = function(resgateId, preco) {
           btn.disabled = false;
       });
   });
+};
 
 window.recusarResgate = function(resgateId, userId, preco) {
   if(confirm('Cancelar pedido e devolver as moedas para o colaborador?')) {
-      // Marca como recusado e devolve o dinheiro ao funcionário
       db.collection('resgates').doc(resgateId.toString()).update({ status: 'recusado' }).then(() => {
           db.collection('usuarios').doc(userId.toString()).get().then(doc => {
               let coins = doc.data().goCoins || 0;
@@ -1908,29 +1873,20 @@ window.recusarResgate = function(resgateId, userId, preco) {
   }
 };
 
-// Alternador de Sub-abas da Gamificação
 window.openGamiTab = function(tabId, btnElement) {
-  // Esconde todas as sub-abas
   document.querySelectorAll('.gami-internal-section').forEach(sec => {
       sec.style.display = 'none';
   });
   
-  // Mostra a aba clicada
   document.getElementById(tabId).style.display = 'block';
   
-  // Remove a classe 'active' de todos os botões e adiciona no clicado
   const botoes = btnElement.parentElement.querySelectorAll('.tab-btn');
   botoes.forEach(b => b.classList.remove('active'));
   btnElement.classList.add('active');
 };
 
-// =======================================================
-// GAMIFICAÇÃO E LOJA - FUNÇÕES DIRETAS (SEM FORMULÁRIOS)
-// =======================================================
-
-// Atualiza o texto de ajuda do câmbio em tempo real
 window.updateExchangeRateHelp = function(valor) {
-  const taxa = parseInt(valor) || 10; // Se apagar tudo, assume 10 para o cálculo base
+  const taxa = parseInt(valor) || 10; 
   const textoAjuda = document.getElementById('gamiExchangeRateHelp');
   
   if (textoAjuda) {
@@ -1939,7 +1895,6 @@ window.updateExchangeRateHelp = function(valor) {
   }
 };
 
-// CARREGA OS DADOS AO ABRIR A ABA
 window.setupAdminGamification = function() {
   db.collection('empresas').doc(currentUser.companyId.toString()).get().then(doc => {
       if (doc.exists) {
@@ -1953,7 +1908,6 @@ window.setupAdminGamification = function() {
           const orcamentoMensal = data.monthlyBudget || 500;
           if (document.getElementById('adminMonthlyBudget')) document.getElementById('adminMonthlyBudget').value = orcamentoMensal;
 
-          // 🔥 NOVO: Carrega o Câmbio e as Marcas Ativas
           const configLoja = data.giftCardConfig || { rate: 10, active: ['uber', 'netflix', 'xbox', 'spotify', 'playstation', 'steam'] };
           if (document.getElementById('gamiExchangeRate')) document.getElementById('gamiExchangeRate').value = configLoja.rate;
           window.updateExchangeRateHelp(configLoja.rate);
@@ -1995,7 +1949,6 @@ window.setupAdminGamification = function() {
   });
 };
 
-// DISPARADO AO CLICAR NA CHAVINHA
 window.alternarChaveGamificacao = function(checkboxElement) {
   const isAtiva = checkboxElement.checked;
   
@@ -2012,7 +1965,6 @@ window.alternarChaveGamificacao = function(checkboxElement) {
   });
 };
 
-// DISPARADO AO CLICAR EM SALVAR
 window.salvarRegrasGamificacao = function(btnElement) {
   const txtOriginal = btnElement.innerHTML;
   btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
@@ -2035,7 +1987,6 @@ window.salvarRegrasGamificacao = function(btnElement) {
   const inputOrcamento = document.getElementById('adminMonthlyBudget');
   const novoOrcamento = inputOrcamento ? parseFloat(inputOrcamento.value) : 500;
 
-  // Captura os Gift Cards marcados e a Taxa de Câmbio
   const activeCards = Array.from(document.querySelectorAll('.chk-giftcard:checked')).map(cb => cb.value);
   const rateInput = document.getElementById('gamiExchangeRate');
   const novaConfigLoja = {
@@ -2046,7 +1997,7 @@ window.salvarRegrasGamificacao = function(btnElement) {
   db.collection('empresas').doc(currentUser.companyId.toString()).set({ 
       gamificacao: novasRegras,
       monthlyBudget: novoOrcamento,
-      giftCardConfig: novaConfigLoja // Guarda no Firebase
+      giftCardConfig: novaConfigLoja
   }, { merge: true }).then(() => {
       
       const compIndex = companies.findIndex(x => x.id === currentUser.companyId);
@@ -2066,179 +2017,169 @@ window.salvarRegrasGamificacao = function(btnElement) {
   });
 };
 
-// =======================================================
-// ESTÚDIO DE AVATARES - LORELEI EXCLUSIVO (FIX SALVAMENTO E F5)
-// =======================================================
-
-// As dezenas de opções calibradas
 const genVar = (count) => Array.from({length: count}, (_, i) => `variant${String(i+1).padStart(2, '0')}`);
 
 const loreleiConfig = {
-    f1: { prop: 'hair', values: genVar(48) },
-    f2: { prop: 'eyes', values: genVar(24) },
-    f3: { prop: 'mouth', values: ['happy01','happy02','happy03','happy04','happy05','happy06','happy07','happy08','happy09','happy10','happy11','happy12','happy13','happy14','happy15','sad01','sad02','sad03','sad04','sad05','sad06'] },
-    f4: { prop: 'glasses', values: ['none', ...genVar(5)] }
+  f1: { prop: 'hair', values: genVar(48) },
+  f2: { prop: 'eyes', values: genVar(24) },
+  f3: { prop: 'mouth', values: ['happy01','happy02','happy03','happy04','happy05','happy06','happy07','happy08','happy09','happy10','happy11','happy12','happy13','happy14','happy15','sad01','sad02','sad03','sad04','sad05','sad06'] },
+  f4: { prop: 'glasses', values: ['none', ...genVar(5)] }
 };
 
 window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
 window.charSessionActive = false;
 
 window.mudarTracoStudio = function(traco, direcao) {
-    const opcoes = loreleiConfig[traco].values;
-    window.charState[traco] += direcao;
-    const max = opcoes.length - 1;
-    
-    if (window.charState[traco] > max) window.charState[traco] = 0;
-    if (window.charState[traco] < 0) window.charState[traco] = max;
-    
-    window.renderStudio();
+  const opcoes = loreleiConfig[traco].values;
+  window.charState[traco] += direcao;
+  const max = opcoes.length - 1;
+  
+  if (window.charState[traco] > max) window.charState[traco] = 0;
+  if (window.charState[traco] < 0) window.charState[traco] = max;
+  
+  window.renderStudio();
 };
 
 window.renderStudio = function() {
-    ['f1', 'f2', 'f3', 'f4'].forEach(t => {
-        const lbl = document.getElementById(`lbl_${t}`);
-        if (lbl) lbl.innerText = window.charState[t];
-    });
+  ['f1', 'f2', 'f3', 'f4'].forEach(t => {
+      const lbl = document.getElementById(`lbl_${t}`);
+      if (lbl) lbl.innerText = window.charState[t];
+  });
 
-    const getCor = (id, fallback) => {
-        const el = document.getElementById(id);
-        return el ? el.value.replace('#', '') : fallback;
-    };
+  const getCor = (id, fallback) => {
+      const el = document.getElementById(id);
+      return el ? el.value.replace('#', '') : fallback;
+  };
 
-    let url = `https://api.dicebear.com/9.x/lorelei/svg?seed=Admin&backgroundColor=${getCor('studioBgColor', 'b6e3f4')}&skinColor=${getCor('studioSkinColor', 'ffdbb4')}&hairColor=${getCor('studioHairColor', '2a2a2a')}`;
+  let url = `https://api.dicebear.com/9.x/lorelei/svg?seed=Admin&backgroundColor=${getCor('studioBgColor', 'b6e3f4')}&skinColor=${getCor('studioSkinColor', 'ffdbb4')}&hairColor=${getCor('studioHairColor', '2a2a2a')}`;
 
-    ['f1', 'f2', 'f3', 'f4'].forEach(f => {
-        const prop = loreleiConfig[f].prop;
-        let val = loreleiConfig[f].values[window.charState[f]];
-        
-        // 🔥 CINTO DE SEGURANÇA: Se a opção não existir, força a primeira! Evita o Erro 400.
-        if (!val) val = loreleiConfig[f].values[0];
+  ['f1', 'f2', 'f3', 'f4'].forEach(f => {
+      const prop = loreleiConfig[f].prop;
+      let val = loreleiConfig[f].values[window.charState[f]];
+      
+      if (!val) val = loreleiConfig[f].values[0];
 
-        if (val === 'none') {
-            if (prop === 'glasses') url += `&glassesProbability=0`;
-        } else {
-            url += `&${prop}=${val}`;
-            if (prop === 'glasses') url += `&glassesProbability=100`;
-        }
-    });
+      if (val === 'none') {
+          if (prop === 'glasses') url += `&glassesProbability=0`;
+      } else {
+          url += `&${prop}=${val}`;
+          if (prop === 'glasses') url += `&glassesProbability=100`;
+      }
+  });
 
-    const imgEl = document.getElementById('avatarStudioImg');
-    const letraEl = document.getElementById('avatarStudioLetra');
-    
-    if (imgEl) { 
-        imgEl.src = url; 
-        imgEl.style.display = 'block'; 
-        const prevContainer = document.getElementById('avatarStudioPreview');
-        if (prevContainer) prevContainer.style.background = 'transparent';
-    }
-    if (letraEl) letraEl.style.display = 'none';
+  const imgEl = document.getElementById('avatarStudioImg');
+  const letraEl = document.getElementById('avatarStudioLetra');
+  
+  if (imgEl) { 
+      imgEl.src = url; 
+      imgEl.style.display = 'block'; 
+      const prevContainer = document.getElementById('avatarStudioPreview');
+      if (prevContainer) prevContainer.style.background = 'transparent';
+  }
+  if (letraEl) letraEl.style.display = 'none';
 };
 
 window.carregarPerfilEAvatar = function() {
-    if (!currentUser) return;
-    
-    const inputNome = document.getElementById('admProfileName');
-    if (inputNome) inputNome.value = currentUser.name;
+  if (!currentUser) return;
+  
+  const inputNome = document.getElementById('admProfileName');
+  if (inputNome) inputNome.value = currentUser.name;
 
-    if (window.charSessionActive) {
-        window.renderStudio();
-        return;
-    }
-    
-    let isNovoOuCorrompido = true;
+  if (window.charSessionActive) {
+      window.renderStudio();
+      return;
+  }
+  
+  let isNovoOuCorrompido = true;
 
-    // Carrega do Banco de Dados
-    if (currentUser.avatarUrl && currentUser.avatarUrl.includes('lorelei')) {
-        try {
-            const urlObj = new URL(currentUser.avatarUrl);
-            
-            const pegaIndex = (param, slotName) => {
-                const val = urlObj.searchParams.get(param);
-                if (!val) return 0;
-                const idx = loreleiConfig[slotName].values.indexOf(val);
-                return idx !== -1 ? idx : 0;
-            };
+  if (currentUser.avatarUrl && currentUser.avatarUrl.includes('lorelei')) {
+      try {
+          const urlObj = new URL(currentUser.avatarUrl);
+          
+          const pegaIndex = (param, slotName) => {
+              const val = urlObj.searchParams.get(param);
+              if (!val) return 0;
+              const idx = loreleiConfig[slotName].values.indexOf(val);
+              return idx !== -1 ? idx : 0;
+          };
 
-            window.charState.f1 = pegaIndex('hair', 'f1');
-            window.charState.f2 = pegaIndex('eyes', 'f2');
-            window.charState.f3 = pegaIndex('mouth', 'f3');
-            const hasGlasses = urlObj.searchParams.get(`glassesProbability`) !== '0';
-            window.charState.f4 = hasGlasses ? pegaIndex('glasses', 'f4') : 0;
+          window.charState.f1 = pegaIndex('hair', 'f1');
+          window.charState.f2 = pegaIndex('eyes', 'f2');
+          window.charState.f3 = pegaIndex('mouth', 'f3');
+          const hasGlasses = urlObj.searchParams.get(`glassesProbability`) !== '0';
+          window.charState.f4 = hasGlasses ? pegaIndex('glasses', 'f4') : 0;
 
-            const pegaCor = (param, id) => {
-                let val = urlObj.searchParams.get(param);
-                const corEl = document.getElementById(id);
-                if (val && corEl) {
-                    val = val.replace('#', ''); // Evita bugar a cor
-                    corEl.value = '#' + val;
-                }
-            };
-            pegaCor('backgroundColor', 'studioBgColor');
-            pegaCor('skinColor', 'studioSkinColor');
-            pegaCor('hairColor', 'studioHairColor');
-            
-            isNovoOuCorrompido = false;
-        } catch(e) { console.warn("Avatar antigo não compatível, limpando..."); }
-    }
-    
-    if (isNovoOuCorrompido) {
-        window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
-        if(document.getElementById('studioBgColor')) document.getElementById('studioBgColor').value = '#b6e3f4';
-        if(document.getElementById('studioSkinColor')) document.getElementById('studioSkinColor').value = '#ffdbb4';
-        if(document.getElementById('studioHairColor')) document.getElementById('studioHairColor').value = '#2a2a2a';
-    }
+          const pegaCor = (param, id) => {
+              let val = urlObj.searchParams.get(param);
+              const corEl = document.getElementById(id);
+              if (val && corEl) {
+                  val = val.replace('#', ''); 
+                  corEl.value = '#' + val;
+              }
+          };
+          pegaCor('backgroundColor', 'studioBgColor');
+          pegaCor('skinColor', 'studioSkinColor');
+          pegaCor('hairColor', 'studioHairColor');
+          
+          isNovoOuCorrompido = false;
+      } catch(e) { console.warn("Avatar antigo não compatível, limpando..."); }
+  }
+  
+  if (isNovoOuCorrompido) {
+      window.charState = { f1: 0, f2: 0, f3: 0, f4: 0 };
+      if(document.getElementById('studioBgColor')) document.getElementById('studioBgColor').value = '#b6e3f4';
+      if(document.getElementById('studioSkinColor')) document.getElementById('studioSkinColor').value = '#ffdbb4';
+      if(document.getElementById('studioHairColor')) document.getElementById('studioHairColor').value = '#2a2a2a';
+  }
 
-    window.renderStudio(); 
-    window.charSessionActive = true; 
+  window.renderStudio(); 
+  window.charSessionActive = true; 
 };
 
-// Salvar Base de Dados
 window.salvarPerfilStudio = function(btnElement) {
-    const txtOriginal = btnElement.innerHTML;
-    btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
-    btnElement.disabled = true;
+  const txtOriginal = btnElement.innerHTML;
+  btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+  btnElement.disabled = true;
 
-    const inputNome = document.getElementById('admProfileName');
-    if (!inputNome) { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
+  const inputNome = document.getElementById('admProfileName');
+  if (!inputNome) { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
 
-    const novoNome = inputNome.value.trim();
-    const novaSenha = document.getElementById('admProfilePassword') ? document.getElementById('admProfilePassword').value.trim() : '';
-    
-    // 🔥 MÁGICA DA CORREÇÃO: Capturamos a URL diretamente da imagem visível na tela!
-    const imgEl = document.getElementById('avatarStudioImg');
-    let novoAvatar = '';
-    if (imgEl && imgEl.src && imgEl.src.includes('dicebear.com')) {
-        novoAvatar = imgEl.src;
-    }
+  const novoNome = inputNome.value.trim();
+  const novaSenha = document.getElementById('admProfilePassword') ? document.getElementById('admProfilePassword').value.trim() : '';
+  
+  const imgEl = document.getElementById('avatarStudioImg');
+  let novoAvatar = '';
+  if (imgEl && imgEl.src && imgEl.src.includes('dicebear.com')) {
+      novoAvatar = imgEl.src;
+  }
 
-    if (!novoNome) { showToast('O nome não pode ficar vazio!', 'error'); btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
+  if (!novoNome) { showToast('O nome não pode ficar vazio!', 'error'); btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
 
-    const updates = { name: novoNome };
-    if (novaSenha) updates.password = novaSenha;
-    if (novoAvatar) updates.avatarUrl = novoAvatar;
+  const updates = { name: novoNome };
+  if (novaSenha) updates.password = novaSenha;
+  if (novoAvatar) updates.avatarUrl = novoAvatar;
 
-    db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
-        currentUser.name = novoNome;
-        if (novaSenha) currentUser.password = novaSenha;
-        if (novoAvatar) currentUser.avatarUrl = novoAvatar;
+  db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
+      currentUser.name = novoNome;
+      if (novaSenha) currentUser.password = novaSenha;
+      if (novoAvatar) currentUser.avatarUrl = novoAvatar;
 
-        const uIndex = users.findIndex(x => x.id === currentUser.id);
-        if (uIndex !== -1) { users[uIndex].name = novoNome; users[uIndex].avatarUrl = novoAvatar; }
+      const uIndex = users.findIndex(x => x.id === currentUser.id);
+      if (uIndex !== -1) { users[uIndex].name = novoNome; users[uIndex].avatarUrl = novoAvatar; }
 
-        const sideName = document.getElementById('sidebarAdminName');
-        if (sideName) sideName.textContent = novoNome.split(' ')[0];
-        const sideAvatar = document.getElementById('adminAvatar');
-        if (sideAvatar) sideAvatar.innerHTML = novoAvatar ? `<img src="${novoAvatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : novoNome.charAt(0).toUpperCase();
+      const sideName = document.getElementById('sidebarAdminName');
+      if (sideName) sideName.textContent = novoNome.split(' ')[0];
+      const sideAvatar = document.getElementById('adminAvatar');
+      if (sideAvatar) sideAvatar.innerHTML = novoAvatar ? `<img src="${novoAvatar}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : novoNome.charAt(0).toUpperCase();
 
-        if (typeof window.renderRankingMensal === 'function') window.renderRankingMensal('rankingAdminContainer');
+      if (typeof window.renderRankingMensal === 'function') window.renderRankingMensal('rankingAdminContainer');
 
-        showToast('Perfil e Avatar guardados com sucesso!');
-        if (document.getElementById('admProfilePassword')) document.getElementById('admProfilePassword').value = '';
-        btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
-        setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
-    }).catch(err => {
-        showToast('Erro ao guardar no sistema.', 'error');
-        btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
-    });
-  };
-}
+      showToast('Perfil e Avatar guardados com sucesso!');
+      if (document.getElementById('admProfilePassword')) document.getElementById('admProfilePassword').value = '';
+      btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
+      setTimeout(() => { btnElement.innerHTML = txtOriginal; btnElement.disabled = false; }, 2000);
+  }).catch(err => {
+      showToast('Erro ao guardar no sistema.', 'error');
+      btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
+  });
+};
