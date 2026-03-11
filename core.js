@@ -1207,7 +1207,7 @@ window.iniciarRadarNotificacoes = function() {
 
         snap.forEach(doc => {
             const data = doc.data();
-            data.id = doc.id; // Garante que temos o ID do documento!
+            data.id = doc.id;
             lista.push(data);
             if (data.lida !== true) naoLidas++;
         });
@@ -1226,10 +1226,30 @@ window.iniciarRadarNotificacoes = function() {
             htmlLista = window.todasNotificacoesGlobais.map(n => {
                 const cursorStyle = n.acaoAlvo ? 'cursor: pointer;' : 'cursor: default;';
                 const hoverClass = n.acaoAlvo ? 'notif-item-hover' : '';
+                
+                let tagPerfil = '';
+                  if (currentUser.role === 'hibrido') {
+                      // Verifica se o título da notificação é típico de ações que o Gestor recebe
+                      const isAdminMsg = ['Entregue', 'Pedido', 'Resgate', 'Interno'].some(palavra => n.titulo.includes(palavra)) || n.acaoAlvo === 'delegar';
+                      
+                      if (isAdminMsg) {
+                          // Etiqueta ROXA para o modo Admin
+                          tagPerfil = `<span style="font-size: 9px; background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); padding: 2px 6px; border-radius: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">Admin</span>`;
+                      } else {
+                          // Etiqueta AMARELA (Âmbar) para o modo Colaborador
+                          tagPerfil = `<span style="font-size: 9px; background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 6px; border-radius: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">Colaborador</span>`;
+                      }
+                  }
+
                 return `
                 <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${n.acaoAlvo}', '${n.id}')" style="padding: 15px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s;">
                     <div style="font-size: 10px; color: var(--color-text-secondary); margin-bottom: 5px;">${new Date(n.createdAt).toLocaleString('pt-BR')}</div>
-                    <strong style="font-size: 13px; display: block; margin-bottom: 4px; color: var(--color-text-primary);">${n.titulo}</strong>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 10px;">
+                        <strong style="font-size: 13px; color: var(--color-text-primary);">${n.titulo}</strong>
+                        ${tagPerfil}
+                    </div>
+                    
                     <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4;">${n.mensagem}</p>
                 </div>`;
             }).join('');
@@ -1245,7 +1265,6 @@ window.iniciarRadarNotificacoes = function() {
                     const notif = change.doc.data();
                     const horaNotificacao = new Date(notif.createdAt).getTime();
                     if (horaNotificacao > horaLogin) {
-                        // 🔥 NOVO: Passa o ID no momento do popup (change.doc.id)
                         dispararNotificacaoNativa(notif.titulo, notif.mensagem, notif.acaoAlvo, change.doc.id);
                     }
                 }
