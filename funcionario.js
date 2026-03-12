@@ -556,28 +556,30 @@ async function showEmployeeSection(sec) {
   }
   
   novoForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const btn = novoForm.querySelector('button[type="submit"]');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
-      btn.disabled = true;
-  
-      const tarefaId = document.getElementById('entregarTarefaId').value;
-      const observacoes = document.getElementById('entregarObservacoes').value;
-      const tituloFinal = document.getElementById('entregarTitulo').value; 
-  
-      const finalizarParaRevisao = (anexosNovos) => {
-        db.collection('tarefas').doc(tarefaId.toString()).update({ 
-            status: 'em_revisao',
-            respostaFuncionario: observacoes,
-            tituloEntrega: tituloFinal,
-            attachments: anexosNovos 
-        }).then(() => {
-            if (window.registrarAcao) {
-                window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'ENTREGAR_TAREFA', `Enviou a tarefa para revisão: ${tituloFinal}`);
-            }
+    e.preventDefault();
+    const btn = novoForm.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+    btn.disabled = true;
 
-            // 🔥 GATILHO: AVISA O GESTOR QUE A TAREFA FOI ENTREGUE
+    // 1. Capturamos tudo o que está no seu novo HTML
+    const tarefaId = document.getElementById('entregarTarefaId').value;
+    const observacoes = document.getElementById('entregarObservacoes').value;
+    const tituloFinal = document.getElementById('entregarTitulo').value; 
+    const quantidade = document.getElementById('entregarQuantidade').value;
+
+    const finalizarParaRevisao = (anexosNovos) => {
+      db.collection('tarefas').doc(tarefaId.toString()).update({ 
+          status: 'em_revisao',
+          quantidade: parseInt(quantidade) || 0, // 🔥 A quantidade vai para o banco de dados aqui!
+          respostaFuncionario: observacoes,
+          tituloEntrega: tituloFinal,
+          attachments: anexosNovos 
+      }).then(() => {
+          if (window.registrarAcao) {
+              window.registrarAcao(currentUser.id, currentUser.companyId, currentUser.name, 'ENTREGAR_TAREFA', `Enviou a tarefa com volume de ${quantidade || 0}: ${tituloFinal}`);
+          }
+          
             db.collection('tarefas').doc(tarefaId.toString()).get().then(docTarefa => {
                 const donoDaTarefa = docTarefa.data().senderId;
                 if (donoDaTarefa) {
@@ -619,7 +621,7 @@ async function showEmployeeSection(sec) {
           finalizarParaRevisao([]);
       }
   });
-  };
+};
   
   window.loadTarefasRecebidas = function() {
   const container = document.getElementById('listaTarefasFuncionario');

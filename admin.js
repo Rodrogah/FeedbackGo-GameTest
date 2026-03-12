@@ -1046,32 +1046,225 @@ if (editUserForm) {
 // =========================================================
 
 function setupAdminDelegarForm() {
-  const container = document.getElementById('listaCheckFuncionarios');
-  if (!container) return;
-
-const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active);
-
-  if (funcDaEmpresa.length === 0) {
-      container.innerHTML = '<p style="opacity: 0.6; text-align: center; padding: 10px;">Nenhum colaborador encontrado.</p>';
-  } else {
-      container.innerHTML = funcDaEmpresa.map(u => `
-          <div style="margin-bottom: 8px;">
-              <input type="checkbox" name="funcDelegado" value="${u.id}" id="checkFunc_${u.id}" class="input-hidden" style="display: none;">
-              <label for="checkFunc_${u.id}" class="green-dot-item">
-                  <div style="display: flex; align-items: center; gap: 12px;">
-                      <div class="dot"></div>
-                      <span style="font-size: 14px;"><strong>${u.name}</strong> <small style="opacity:0.7">(${u.team || 'Sem Equipe'})</small></span>
-                  </div>
-              </label>
-          </div>
-      `).join('');
-  }
-
   const form = document.getElementById('formDelegarTarefa');
   if (!form) return;
   const novoForm = form.cloneNode(true);
   form.parentNode.replaceChild(novoForm, form);
 
+  // 🔥 O "CÉREBRO" DO ALGORITMO (COM CAIXA DUPLA E SCROLL EMBUTIDO)
+  const renderizarListaInteligente = () => {
+    const container = document.getElementById('listaCheckFuncionarios');
+    if (!container) return;
+
+    // 1. DESTRÓI A CAIXA ANTIGA QUE QUEBRAVA O MODO ESCURO E O SCROLL
+    container.style.background = 'transparent';
+    container.style.border = 'none';
+    container.style.padding = '0';
+    container.style.maxHeight = 'none';
+    container.style.overflow = 'visible';
+    container.style.boxShadow = 'none';
+
+    const selectCat = novoForm.querySelector('#delegarCategoria');
+    const categoriaSelecionada = selectCat ? selectCat.value : '';
+    const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId && u.active);
+
+    // Extração de Estatísticas Complexas
+    const stats = {};
+    funcDaEmpresa.forEach(u => stats[u.id] = { vezes: 0, somaQtd: 0, mediaQtd: 0, somaXp: 0, score: 0 });
+
+    const atividadesDaCategoria = activities.filter(a => 
+        a.companyId === currentUser.companyId && 
+        a.status === 'concluido' && 
+        a.category === categoriaSelecionada
+    );
+
+    let totalQtdGlobal = 0;
+    let totalEntregasGlobal = 0;
+
+    atividadesDaCategoria.forEach(a => {
+        if (stats[a.userId]) {
+            const qtd = parseInt(a.quantidade) || 0;
+            stats[a.userId].vezes++;
+            stats[a.userId].somaQtd += qtd;
+            stats[a.userId].somaXp += (parseInt(a.xpEarned) || 0);
+            
+            if (stats[a.userId].vezes >= 5) {
+                totalQtdGlobal += qtd;
+                totalEntregasGlobal++;
+            }
+        }
+    });
+
+    const mediaGlobal = totalEntregasGlobal > 0 ? (totalQtdGlobal / totalEntregasGlobal) : 0;
+
+    // Cálculo do "Score" com Trava de 5 Entregas
+    funcDaEmpresa.forEach(u => {
+        let s = stats[u.id];
+        
+        if (s.vezes >= 5) {
+            s.mediaQtd = s.somaQtd / s.vezes;
+            const qualidadeXp = s.somaXp / s.vezes; 
+            
+            const ptsExperiencia = s.vezes * 10; 
+            const ptsVolume = s.mediaQtd * 2; 
+            const ptsAcimaMedia = (mediaGlobal > 0 && s.mediaQtd > mediaGlobal) ? ((s.mediaQtd / mediaGlobal) * 20) : 0; 
+            const ptsQualidade = qualidadeXp * 0.5; 
+
+            s.score = ptsExperiencia + ptsVolume + ptsAcimaMedia + ptsQualidade;
+        } else {
+            s.score = -1; 
+        }
+    });
+
+    funcDaEmpresa.sort((a, b) => stats[b.id].score - stats[a.id].score);
+
+    if (funcDaEmpresa.length === 0) {
+        container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Nenhum colaborador encontrado.</p>';
+        return;
+    }
+
+    const indicados = funcDaEmpresa.filter(u => stats[u.id].vezes >= 5).slice(0, 6);
+    const outros = funcDaEmpresa.filter(u => !indicados.includes(u));
+
+    const gerarCard = (u, isIndicado) => {
+        const s = stats[u.id];
+        let infoEstatisticas = '';
+        
+        if (s.vezes >= 5) {
+            const tagDesempenho = s.mediaQtd > mediaGlobal 
+                ? '<span style="color: #10b981; font-weight: 900; font-size: 15px;"><i class="fa-solid fa-arrow-trend-up"></i> Acima</span>' 
+                : '<span style="color: #64748b; font-weight: 900; font-size: 15px;"><i class="fa-solid fa-minus"></i> Na Média</span>';
+            
+            let qualidadeVisual = "⭐⭐⭐⭐⭐";
+            if (s.score < 50) qualidadeVisual = "⭐⭐⭐⭐";
+            if (s.score < 30) qualidadeVisual = "⭐⭐⭐";
+
+            const mediaArredondada = Math.round(s.mediaQtd);
+
+            // As caixas agora usam var(--color-bg-secondary) para se adaptarem ao Modo Escuro perfeitamente
+            infoEstatisticas = `
+            <div style="margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                
+                <div style="background: var(--color-bg-secondary, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-left: 4px solid #3b82f6; border-radius: 6px; padding: 6px 15px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <span style="font-size: 10px; color: var(--color-text-secondary, #64748b); font-weight: 800; text-transform: uppercase;">Total de Entregas</span>
+                    <span style="font-size: 16px; font-weight: 900; color: var(--color-text-primary, #1e293b); margin-top: 2px;">${s.vezes}</span>
+                </div>
+
+                <div style="background: var(--color-bg-secondary, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-left: 4px solid #f59e0b; border-radius: 6px; padding: 6px 15px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <span style="font-size: 10px; color: var(--color-text-secondary, #64748b); font-weight: 800; text-transform: uppercase;">Média de Entregas</span>
+                    <span style="font-size: 16px; font-weight: 900; color: var(--color-text-primary, #1e293b); margin-top: 2px;">${mediaArredondada}</span>
+                </div>
+
+                <div style="background: var(--color-bg-secondary, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-left: 4px solid #10b981; border-radius: 6px; padding: 6px 15px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <span style="font-size: 10px; color: var(--color-text-secondary, #64748b); font-weight: 800; text-transform: uppercase;">Desempenho</span>
+                    <div style="margin-top: 2px;">${tagDesempenho}</div>
+                </div>
+
+                <div style="background: var(--color-bg-secondary, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); border-left: 4px solid #a855f7; border-radius: 6px; padding: 6px 15px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                    <span style="font-size: 10px; color: var(--color-text-secondary, #64748b); font-weight: 800; text-transform: uppercase;">Qualidade</span>
+                    <span style="font-size: 11px; margin-top: 4px; letter-spacing: 1px;">${qualidadeVisual}</span>
+                </div>
+
+            </div>`;
+        } else if (s.vezes > 0 && s.vezes < 5) {
+            infoEstatisticas = `
+            <div style="font-size: 11px; color: #854d0e; background: #fef9c3; margin-top: 8px; padding: 8px; border-radius: 6px; border: 1px dashed #fcd34d; font-weight: 600;">
+                <i class="fa-solid fa-hourglass-half"></i> Em fase de calibragem: <span style="color: #854d0e !important; font-weight: 900;">${s.vezes} de 5</span> entregas realizadas. (Aguardando mais dados).
+            </div>`;
+        } else {
+            infoEstatisticas = `<div style="font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; opacity: 0.6;"><i class="fa-solid fa-circle-info"></i> Nunca realizou este serviço.</div>`;
+        }
+
+        const bordaDestaque = isIndicado ? 'border: 1px solid var(--color-success); background: rgba(16, 185, 129, 0.05);' : '';
+        const seloIndicado = isIndicado ? `<span style="background: #10b981; color: white; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-award"></i> Indicado</span>` : '';
+
+        return `
+        <div style="margin-bottom: 8px;">
+            <input type="checkbox" name="funcDelegado" value="${u.id}" id="checkFunc_${u.id}" class="input-hidden" style="display: none;">
+            <label for="checkFunc_${u.id}" class="green-dot-item" style="cursor: pointer; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; transition: 0.2s; ${bordaDestaque}">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="dot"></div>
+                        <span style="font-size: 14px; color: var(--color-text-primary);"><strong>${u.name}</strong> <small style="opacity:0.7">(${u.team || 'Sem Equipe'})</small></span>
+                    </div>
+                    ${seloIndicado}
+                </div>
+                ${infoEstatisticas}
+            </label>
+        </div>`;
+    };
+
+    // 🔥 2. A MÁGICA DA CAIXA DUPLA (Scroll flutuante camuflado na cor do fundo)
+    let htmlFinal = `
+    <style>
+        /* Truque da borda invisível: faz o scroll parecer flutuante e afasta da direita */
+        .scroll-inteligente::-webkit-scrollbar { width: 14px; }
+        .scroll-inteligente::-webkit-scrollbar-track { background: transparent; }
+        .scroll-inteligente::-webkit-scrollbar-thumb { 
+            background-color: var(--color-border, #cbd5e1); 
+            border-radius: 10px; 
+            border: 4px solid var(--color-bg-primary, #ffffff); 
+        }
+        .scroll-inteligente::-webkit-scrollbar-thumb:hover {
+            background-color: var(--color-text-secondary, #94a3b8);
+        }
+    </style>
+    
+    <div style="background: var(--color-bg-primary, #ffffff); border: 1px solid var(--color-border, #e2e8f0); border-radius: 12px; padding: 10px 8px 10px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+        <div class="scroll-inteligente" style="max-height: 250px; overflow-y: auto; overflow-x: hidden; padding-right: 14px;">
+    `;
+
+    // Títulos e Linhas construídos com CSS Grid
+    if (indicados.length > 0) {
+        htmlFinal += `
+        <div style="display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 15px; margin: 5px 0 15px 0; width: 100%;">
+            <span style="font-size: 12px; font-weight: 900; color: var(--color-success, #10b981); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">
+                <i class="fa-solid fa-ranking-star"></i> Pessoas Indicadas
+            </span>
+            <div style="height: 2px; background-color: var(--color-border, #e2e8f0); width: 100%; border-radius: 2px;"></div>
+        </div>`;
+        htmlFinal += indicados.map(u => gerarCard(u, true)).join('');
+    } else {
+        htmlFinal += `
+        <div style="display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 15px; margin: 5px 0 15px 0; width: 100%;">
+            <span style="font-size: 12px; font-weight: 900; color: var(--color-success, #10b981); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">
+                <i class="fa-solid fa-ranking-star"></i> Pessoas Indicadas
+            </span>
+            <div style="height: 2px; background-color: var(--color-border, #e2e8f0); width: 100%; border-radius: 2px;"></div>
+        </div>
+        <div style="background: rgba(0,0,0,0.02); border: 1px dashed var(--color-border, #cbd5e1); border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 15px;">
+            <i class="fa-solid fa-user-astronaut" style="font-size: 20px; color: var(--color-text-secondary, #64748b); margin-bottom: 8px; opacity: 0.5;"></i>
+            <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary, #64748b);">Nenhum especialista formado ainda.<br><small>Os colaboradores precisam de concluir pelo menos <strong>5 entregas</strong> para entrarem no ranking.</small></p>
+        </div>`;
+    }
+
+    if (outros.length > 0) {
+        htmlFinal += `
+        <div style="display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 15px; margin: 25px 0 15px 0; width: 100%;">
+            <span style="font-size: 12px; font-weight: 800; color: var(--color-text-secondary, #64748b); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">
+                <i class="fa-solid fa-users"></i> Outros Colaboradores
+            </span>
+            <div style="height: 2px; background-color: var(--color-border, #e2e8f0); width: 100%; border-radius: 2px;"></div>
+        </div>`;
+        htmlFinal += outros.map(u => gerarCard(u, false)).join('');
+    }
+
+    htmlFinal += `
+        </div>
+    </div>`;
+
+    container.innerHTML = htmlFinal;
+};np
+
+  const selectCategoria = novoForm.querySelector('#delegarCategoria');
+  if (selectCategoria) {
+      selectCategoria.addEventListener('change', renderizarListaInteligente);
+  }
+  
+  // Roda a primeira vez ao abrir a tela
+  renderizarListaInteligente();
+
+  // =============== RESTANTE DA LÓGICA DE UPLOAD E ENVIO ===============
   const areaArquivos = novoForm.querySelector('.file-drop-area');
   if (areaArquivos && !document.getElementById('boxDificuldadeGamificacao')) {
       const c = companies.find(x => x.id === currentUser.companyId);
@@ -1168,7 +1361,6 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
 
               promessasFirebase.push(db.collection('tarefas').doc(tarefaId.toString()).set(novaTarefa));
               
-              // 🔥 GATILHO DA NOTIFICAÇÃO DE NOVA TAREFA COM REDIRECIONAMENTO
               promessasFirebase.push(db.collection('notificacoes').add({
                   userId: userId,
                   titulo: '🎯 Nova Tarefa!',
@@ -1187,6 +1379,9 @@ const funcDaEmpresa = users.filter(u => u.companyId === currentUser.companyId &&
               arquivosSelecionados = []; 
               btn.innerHTML = originalText;
               btn.disabled = false;
+              
+              renderizarListaInteligente(); // Reseta o algoritmo após o envio
+              
               if (typeof loadTarefasEnviadas === 'function') loadTarefasEnviadas(); 
           }).catch((err) => {
               showToast('Erro ao enviar.', 'error');
@@ -1341,6 +1536,16 @@ window.abrirDetalhesTarefa = function(idTarefa) {
       document.getElementById('detalheTarefaFunc').textContent = func ? func.name : 'Colaborador';
       document.getElementById('detalheTarefaResposta').textContent = t.respostaFuncionario || 'Nenhuma mensagem escrita na entrega.';
       
+      // 🔥 NOVO: Lê a quantidade do Firebase e mostra a caixa (se for maior que 0)
+      const boxQtd = document.getElementById('boxQuantidadeAdmin');
+      const txtQtd = document.getElementById('detalheTarefaQuantidade');
+      if (t.quantidade && parseInt(t.quantidade) > 0) {
+          txtQtd.textContent = t.quantidade;
+          boxQtd.style.display = 'block';
+      } else {
+          boxQtd.style.display = 'none'; // Esconde se a tarefa não for de números
+      }
+      
       const boxAnexos = document.getElementById('detalheTarefaAnexos');
       if (t.attachments && t.attachments.length > 0) {
           let html = '<strong style="font-size:13px; display:block; margin-bottom: 5px;">Anexos da Entrega (Baixar):</strong><div style="display: flex; gap: 10px; flex-wrap: wrap;">';
@@ -1366,7 +1571,6 @@ window.abrirDetalhesTarefa = function(idTarefa) {
       document.getElementById('modalDetalhesTarefa').classList.remove('hidden');
   });
 };
-
 window.fecharDetalhesTarefa = function() {
   document.getElementById('modalDetalhesTarefa').classList.add('hidden');
 };
