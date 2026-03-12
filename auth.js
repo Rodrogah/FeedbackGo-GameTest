@@ -122,41 +122,61 @@ document.getElementById('registerForm').addEventListener('submit', function (e) 
 });
 
 // ==========================================
-// 3. LOGIN MANUAL DE UTILIZADOR
+// 3. LOGIN MANUAL DE UTILIZADOR (SERVIDOR-SIDE)
 // ==========================================
 document.getElementById('loginForm').addEventListener('submit', function (e) {
   e.preventDefault();
   const em = document.getElementById('loginEmail').value.trim();
   const pw = document.getElementById('loginPassword').value;
-  const u = users.find((u) => u.email === em && u.password === pw && u.active);
   
-  if (u) {
-      currentUser = u;
-      localStorage.setItem('feedbackgo_logged_user', u.id);
-      
-      // Marca como ONLINE
-      db.collection('usuarios').doc(u.id.toString()).update({ isOnline: true });
-      
-      // Pega a data e hora exata do Brasil (Fuso Local)
-      const dataLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString();
-      
-      // Salva o login MANUAL diretamente
-      db.collection('acessos').add({
-          userId: u.id,
-          companyId: u.companyId,
-          userName: u.name,
-          acao: 'LOGIN',
-          detalhes: 'Fez login no sistema',
-          timestamp: dataLocal
-      });
+  const btn = document.querySelector('#loginForm button[type="submit"]');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Autenticando...';
+  btn.disabled = true;
+  
+  // 🔥 MÁGICA DA SEGURANÇA: Consulta o servidor diretamente, 
+  // em vez de procurar a senha na memória do navegador.
+  db.collection('usuarios')
+    .where('email', '==', em)
+    .where('password', '==', pw)
+    .where('active', '==', true)
+    .get()
+    .then((snap) => {
+        if (!snap.empty) {
+            // Sucesso! O servidor validou as credenciais.
+            const doc = snap.docs[0];
+            const u = doc.data();
+            currentUser = u;
+            localStorage.setItem('feedbackgo_logged_user', u.id);
+            
+            db.collection('usuarios').doc(u.id.toString()).update({ isOnline: true });
+            
+            const dataLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString();
+            
+            db.collection('acessos').add({
+                userId: u.id,
+                companyId: u.companyId,
+                userName: u.name,
+                acao: 'LOGIN',
+                detalhes: 'Fez login seguro no sistema',
+                timestamp: dataLocal
+            });
 
-      // 🔒 Trava a sessão para não duplicar se ele der F5 depois de logar
-      sessionStorage.setItem('sessao_registrada', 'sim');
-
-      showPanel(u.role);
-  } else {
-      showNotice('loginAlert', 'Credenciais inválidas.', 'error');
-  }
+            sessionStorage.setItem('sessao_registrada', 'sim');
+            showPanel(u.role);
+        } else {
+            // Falha
+            showNotice('loginAlert', 'E-mail ou senha inválidos.', 'error');
+        }
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    })
+    .catch((err) => {
+        console.error("Erro no login:", err);
+        showNotice('loginAlert', 'Erro de conexão com o servidor.', 'error');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
 });
 
 // ==========================================

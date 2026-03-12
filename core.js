@@ -72,12 +72,21 @@ db.collection('usuarios').onSnapshot((snap) => {
   checkFirstLoad();
 }, (err) => console.error('Erro Usuários:', err));
 
-// 📡 Radar das Atividades
-db.collection('atividades').onSnapshot((snap) => {
-  activities = snap.docs.map((doc) => doc.data());
-  nextActivityId = activities.length > 0 ? Math.max(...activities.map((a) => a.id)) + 1 : 1;
-  loadState.act = true;
-  checkFirstLoad();
+// Radar das Atividades (BLINDADO CONTRA LAG - CARREGA APENAS ÚLTIMOS 90 DIAS)
+const dataLimite = new Date();
+dataLimite.setDate(dataLimite.getDate() - 90); 
+const dataLimiteStr = dataLimite.toISOString().split('T')[0];
+
+db.collection('atividades')
+  .where('date', '>=', dataLimiteStr)
+  .onSnapshot((snap) => {
+    activities = snap.docs.map((doc) => doc.data());
+    
+    // Como os IDs agora usam Date.now(), não precisamos mais do cálculo pesado de Math.max!
+    nextActivityId = Date.now(); 
+    
+    loadState.act = true;
+    checkFirstLoad();
 }, (err) => console.error('Erro Atividades:', err));
 
 function refreshLiveData() {
