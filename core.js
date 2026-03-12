@@ -1397,24 +1397,25 @@ window.verificarTarefasExpiradas = async function() {
 
         snapTarefas.forEach(doc => {
             const t = doc.data();
-            const dataCriacao = t.createdAt.split('T')[0]; 
+            // 🔥 A MÁGICA: Lê o deadline customizado. Se for uma tarefa muito antiga sem deadline, usa a data de criação
+            const dataPrazo = t.deadline || t.createdAt.split('T')[0]; 
             
-            // Se o prazo expirou (criou ontem ou antes e não entregou)
-            if (dataCriacao < hojeLocal) {
+            // Se o dia de HOJE for MAIOR que a DATA DO PRAZO (ex: hoje é dia 15 e o prazo era dia 14), expirou!
+            if (hojeLocal > dataPrazo) {
                 batch.update(doc.ref, { status: 'nao_concluido' });
                 countExpiradas++;
 
-                // 🔥 A MÁGICA DO HISTÓRICO: O Robô copia a tarefa reprovada para a tabela geral de Atividades!
+                // O Robô copia a tarefa reprovada para a tabela geral de Atividades!
                 const idNovaAtiv = Date.now() + Math.floor(Math.random() * 10000);
                 const refAtiv = db.collection('atividades').doc(String(idNovaAtiv));
                 
                 batch.set(refAtiv, {
                     ...t,
                     id: idNovaAtiv,
-                    date: hojeLocal, // A data em que o sistema marcou a falha
+                    date: hojeLocal,
                     status: 'nao_concluido',
                     xpEarned: 0,
-                    tarefaVinculadaId: String(t.id), // Mantém a ligação à tarefa original
+                    tarefaVinculadaId: String(t.id),
                     logs: [{ 
                         date: new Date().toISOString(), 
                         userName: 'Sistema (SLA Automático)', 

@@ -1267,28 +1267,44 @@ function setupAdminDelegarForm() {
 
   // =============== RESTANTE DA LÓGICA DE UPLOAD E ENVIO ===============
   const areaArquivos = novoForm.querySelector('.file-drop-area');
-  if (areaArquivos && !document.getElementById('boxDificuldadeGamificacao')) {
+  if (areaArquivos && !document.getElementById('boxPrazoEDificuldade')) {
       const c = companies.find(x => x.id === currentUser.companyId);
       const isGamiAtiva = c && c.gamificationEnabled === true;
 
       const formGroupArquivos = areaArquivos.parentNode;
-      const divDif = document.createElement('div');
-      divDif.className = 'form-group';
-      divDif.id = 'boxDificuldadeGamificacao'; 
-      divDif.style.marginTop = "15px";
-      divDif.style.display = isGamiAtiva ? 'block' : 'none'; 
+      const divContainer = document.createElement('div');
+      divContainer.id = 'boxPrazoEDificuldade'; 
+      divContainer.style.marginTop = "15px";
+      divContainer.style.display = "grid";
+      // Se a loja estiver ativa divide em 2 colunas, se não, o Prazo ocupa tudo
+      divContainer.style.gridTemplateColumns = isGamiAtiva ? "1fr 1fr" : "1fr";
+      divContainer.style.gap = "15px";
       
-      divDif.innerHTML = `
-          <label><i class="fa-solid fa-layer-group"></i> Dificuldade da Tarefa</label>
-          <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.05);">
-              <option value="2">Fácil</option>
-              <option value="3" selected>Média</option>
-              <option value="4">Difícil</option>
-          </select>
+      let htmlExtra = `
+          <div class="form-group" style="margin: 0;">
+              <label><i class="fa-solid fa-calendar-day"></i> Prazo Limite (Opcional)</label>
+              <input type="date" id="delegarPrazo" class="form-control" style="border: 2px solid var(--color-border); background: var(--color-bg-secondary); cursor: pointer;">
+              <small style="color: var(--color-text-secondary); font-size: 11px;">Vence hoje à meia-noite se ficar em branco.</small>
+          </div>
       `;
-      formGroupArquivos.parentNode.insertBefore(divDif, formGroupArquivos.nextSibling);
+
+      if (isGamiAtiva) {
+          htmlExtra += `
+          <div class="form-group" style="margin: 0;">
+              <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
+              <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.05);">
+                  <option value="2">Fácil (Peso 2 - 100 XP)</option>
+                  <option value="3" selected>Média (Peso 3 - 150 XP)</option>
+                  <option value="4">Difícil (Peso 4 - 200 XP)</option>
+              </select>
+          </div>`;
+      }
+      
+      divContainer.innerHTML = htmlExtra;
+      formGroupArquivos.parentNode.insertBefore(divContainer, formGroupArquivos.nextSibling);
   }
 
+  // ... (código dos anexos continua igual)
   let arquivosSelecionados = [];
   const fileInput = novoForm.querySelector('#delegarArquivos');
   const fileListDisplay = novoForm.querySelector('#delegarArquivosLista');
@@ -1296,24 +1312,11 @@ function setupAdminDelegarForm() {
   if (fileInput) {
     fileInput.addEventListener('change', function () {
       const files = Array.from(this.files);
-      if (files.length > 3) {
-        showToast('Máximo de 3 arquivos!', 'error');
-        this.value = '';
-        fileListDisplay.innerHTML = '';
-        arquivosSelecionados = [];
-        return;
-      }
+      if (files.length > 3) return showToast('Máximo de 3 arquivos!', 'error');
       arquivosSelecionados = [];
       fileListDisplay.innerHTML = '';
-
       for (let i = 0; i < files.length; i++) {
-        if (files[i].size > 1 * 1024 * 1024) {
-          showToast(`O arquivo ${files[i].name} é muito pesado (Máx 1MB)!`, 'error');
-          this.value = '';
-          fileListDisplay.innerHTML = '';
-          arquivosSelecionados = [];
-          return;
-        }
+        if (files[i].size > 1 * 1024 * 1024) return showToast(`Arquivo muito pesado!`, 'error');
         arquivosSelecionados.push(files[i]);
         fileListDisplay.innerHTML += `<div class="custom-file-item" style="font-size:12px; padding:5px 0;"><i class="fa-solid fa-file-lines" style="color: var(--color-info);"></i> ${files[i].name}</div>`;
       }
@@ -1334,10 +1337,13 @@ function setupAdminDelegarForm() {
       const titulo = document.getElementById('delegarTitulo').value;
       const descricao = document.getElementById('delegarDescricao').value;
       const categoria = document.getElementById('delegarCategoria').value;
-      
       const difSelect = document.getElementById('delegarDificuldade');
       const dificuldade = difSelect ? parseInt(difSelect.value) : 3;
       const dataAtual = new Date().toISOString();
+
+      // 🔥 LÊ O PRAZO SELECIONADO (Se em branco, assume hoje)
+      const inputPrazo = document.getElementById('delegarPrazo');
+      const prazoEscolhido = (inputPrazo && inputPrazo.value) ? inputPrazo.value : dataAtual.split('T')[0];
 
       const dispararTarefas = (anexosProntos) => {
           let promessasFirebase = [];
@@ -1355,13 +1361,13 @@ function setupAdminDelegarForm() {
                   description: descricao,
                   category: categoria,
                   dificuldade: dificuldade,
+                  deadline: prazoEscolhido, // 🔥 GRAVA O PRAZO NO BANCO DE DADOS
                   attachments: anexosProntos || [],
                   status: 'pendente', 
                   createdAt: dataAtual
               };
 
               promessasFirebase.push(db.collection('tarefas').doc(tarefaId.toString()).set(novaTarefa));
-              
               promessasFirebase.push(db.collection('notificacoes').add({
                   userId: userId,
                   titulo: '🎯 Nova Tarefa!',
@@ -1380,18 +1386,16 @@ function setupAdminDelegarForm() {
               arquivosSelecionados = []; 
               btn.innerHTML = originalText;
               btn.disabled = false;
-              
-              renderizarListaInteligente(); // Reseta o algoritmo após o envio
-              
+              renderizarListaInteligente();
               if (typeof loadTarefasEnviadas === 'function') loadTarefasEnviadas(); 
-          }).catch((err) => {
+          }).catch(() => {
               showToast('Erro ao enviar.', 'error');
               btn.innerHTML = originalText;
               btn.disabled = false;
           });
       };
 
-      if (arquivosSelecionados && arquivosSelecionados.length > 0) {
+      if (arquivosSelecionados.length > 0) {
           btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Anexando...';
           const promessasDeArquivos = arquivosSelecionados.map((file) => {
               return new Promise((resolve) => {
@@ -1401,9 +1405,7 @@ function setupAdminDelegarForm() {
               });
           });
           Promise.all(promessasDeArquivos).then((anexos) => dispararTarefas(anexos));
-      } else {
-          dispararTarefas([]); 
-      }
+      } else { dispararTarefas([]); }
   });
 }
 

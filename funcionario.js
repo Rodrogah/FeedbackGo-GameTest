@@ -655,11 +655,27 @@ async function showEmployeeSection(sec) {
 
         const pendente = t.status === 'pendente';
         const emRevisao = t.status === 'em_revisao';
-        const expirada = t.status === 'nao_concluido'; // 🔥 Reconhece as expiradas
+        const expirada = t.status === 'nao_concluido'; 
+
+        // 🔥 INTELIGÊNCIA DE PRAZOS
+        const hojeLocal = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        const dataPrazo = t.deadline || t.createdAt.split('T')[0];
+        let avisoPrazo = '';
         
+        if (pendente) {
+            if (dataPrazo === hojeLocal) {
+                avisoPrazo = `<span style="color: #ea580c; font-weight: 800; margin-left: 10px; background: #ffedd5; padding: 3px 8px; border-radius: 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Vence Hoje!</span>`;
+            } else if (dataPrazo > hojeLocal) {
+                const d1 = new Date(dataPrazo + "T00:00:00");
+                const d2 = new Date(hojeLocal + "T00:00:00");
+                const diffDias = Math.ceil(Math.abs(d1 - d2) / (1000 * 60 * 60 * 24));
+                avisoPrazo = `<span style="color: var(--color-info); margin-left: 10px; font-weight: 600; background: rgba(59,130,246,0.1); padding: 3px 8px; border-radius: 6px;"><i class="fa-solid fa-calendar"></i> Faltam ${diffDias} dia(s)</span>`;
+            }
+        }
+      
         let corBorda = 'border-left: 4px solid var(--color-success);'; 
         let badge = `<span class="badge" style="background:#dcfce7; color:#166534;">Concluída & Aprovada</span>`;
-        
+      
         if (expirada) {
             corBorda = 'border-left: 4px solid var(--color-danger); opacity: 0.7;';
             badge = `<span class="badge" style="background:#fee2e2; color:#991b1b; border: 1px solid #f87171;"><i class="fa-solid fa-clock-rotate-left"></i> Expirada</span>`;
@@ -676,7 +692,7 @@ async function showEmployeeSection(sec) {
         html += `
         <div class="card" style="padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; ${corBorda}">
             <div style="flex: 1;">
-                <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px;">De: ${nomeAdmin} • ${dataFormatada}</div>
+                <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; display: flex; align-items: center;">De: ${nomeAdmin} • ${dataFormatada} ${avisoPrazo}</div>
                 <h4 style="margin: 0 0 5px 0;">${t.title}</h4>
                 ${badge}
             </div>
