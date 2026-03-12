@@ -259,20 +259,21 @@ async function showEmployeeSection(sec) {
     const actsForStatus = getFilteredFuncDashboardData(true, false);
     const ctxStatus = document.getElementById('funcStatusChart');
     if (ctxStatus) {
-        let conc = 0, and = 0, pend = 0;
+        let conc = 0, and = 0, pend = 0, exp = 0;
         actsForStatus.forEach((a) => {
             if (a.status === 'concluido') conc++;
             else if (a.status === 'andamento') and++;
             else if (a.status === 'pendente') pend++;
+            else if (a.status === 'nao_concluido') exp++;
         });
   
-        const statusMap = ['concluido', 'andamento', 'pendente'];
+        const statusMap = ['concluido', 'andamento', 'pendente', 'nao_concluido'];
         const activeColors = isDark 
-            ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)'] 
-            : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)'];
+            ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)', 'rgba(153, 27, 27, 0.9)'] 
+            : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)', 'rgba(153, 27, 27, 0.9)'];
         const inactiveColors = isDark
-            ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)']
-            : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)'];
+            ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)', 'rgba(153, 27, 27, 0.15)']
+            : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)', 'rgba(153, 27, 27, 0.2)'];
   
         const bgStatus = statusMap.map((st, i) => {
             if (!window.funcDashActiveStatus) return activeColors[i];
@@ -283,9 +284,9 @@ async function showEmployeeSection(sec) {
         window.funcStatusChartInstance = new Chart(ctxStatus, {
             type: 'doughnut',
             data: {
-                labels: ['Concluído', 'Em Andamento', 'Pendente'],
+                labels: ['Concluído', 'Em Andamento', 'Pendente', 'Expirada'],
                 datasets: [{
-                    data: [conc, and, pend],
+                    data: [conc, and, pend, exp],
                     backgroundColor: bgStatus,
                     borderWidth: 2,
                     borderColor: isDark ? '#1e293b' : '#ffffff',
@@ -639,51 +640,58 @@ async function showEmployeeSection(sec) {
       querySnapshot.forEach(doc => lista.push(doc.data()));
       
       lista.sort((a, b) => {
-          const order = { 'pendente': 1, 'em_revisao': 2, 'concluido': 3 };
-          if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
-          return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-  
-      let html = `<div style="display: grid; gap: 15px;">`;
-  
-      lista.forEach(t => {
-          const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
-          const admin = users.find(u => u.id === t.senderId);
-          const nomeAdmin = admin ? admin.name : 'Administrador';
-  
-          const pendente = t.status === 'pendente';
-          const emRevisao = t.status === 'em_revisao';
-          
-          let corBorda = 'border-left: 4px solid var(--color-success);'; 
-          let badge = `<span class="badge" style="background:#dcfce7; color:#166534;">Concluída & Aprovada</span>`;
-          
-          if (pendente) {
-              corBorda = t.feedbackAdmin ? 'border-left: 4px solid var(--color-danger);' : 'border-left: 4px solid var(--color-warning);';
-              badge = t.feedbackAdmin 
-                  ? `<span class="badge" style="background:#fee2e2; color:#991b1b;">Devolvida c/ Erro</span>` 
-                  : `<span class="badge" style="background:#fef9c3; color:#854d0e;">Pendente</span>`;
-          } else if (emRevisao) {
-              corBorda = 'border-left: 4px solid var(--color-info);';
-              badge = `<span class="badge" style="background:#dbeafe; color:#1e40af;">Em Revisão</span>`;
-          }
-  
-          html += `
-          <div class="card" style="padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; ${corBorda}">
-              <div style="flex: 1;">
-                  <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px;">De: ${nomeAdmin} • ${dataFormatada}</div>
-                  <h4 style="margin: 0 0 5px 0;">${t.title}</h4>
-                  ${badge}
-              </div>
-              <div>
-                  ${pendente
-                      ? `<button class="btn btn-primary btn-small" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-reply"></i> ${t.feedbackAdmin ? 'Ver Erro e Reenviar' : 'Abrir & Responder'}</button>`
-                      : emRevisao 
-                          ? `<button class="btn btn-info btn-small" onclick="abrirModalTarefa('${t.id}')" style="background: var(--color-info); color: white; border: none;"><i class="fa-solid fa-pen"></i> Editar Entrega</button>`
-                          : `<button class="btn btn-secondary btn-small" disabled><i class="fa-solid fa-check-double"></i> Aprovada</button>`
-                  }
-              </div>
-          </div>`;
-      });
+        // Adicionamos a expirada no final da fila (4)
+        const order = { 'pendente': 1, 'em_revisao': 2, 'concluido': 3, 'nao_concluido': 4 };
+        if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    let html = `<div style="display: grid; gap: 15px;">`;
+
+    lista.forEach(t => {
+        const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
+        const admin = users.find(u => u.id === t.senderId);
+        const nomeAdmin = admin ? admin.name : 'Administrador';
+
+        const pendente = t.status === 'pendente';
+        const emRevisao = t.status === 'em_revisao';
+        const expirada = t.status === 'nao_concluido'; // 🔥 Reconhece as expiradas
+        
+        let corBorda = 'border-left: 4px solid var(--color-success);'; 
+        let badge = `<span class="badge" style="background:#dcfce7; color:#166534;">Concluída & Aprovada</span>`;
+        
+        if (expirada) {
+            corBorda = 'border-left: 4px solid var(--color-danger); opacity: 0.7;';
+            badge = `<span class="badge" style="background:#fee2e2; color:#991b1b; border: 1px solid #f87171;"><i class="fa-solid fa-clock-rotate-left"></i> Expirada</span>`;
+        } else if (pendente) {
+            corBorda = t.feedbackAdmin ? 'border-left: 4px solid var(--color-danger);' : 'border-left: 4px solid var(--color-warning);';
+            badge = t.feedbackAdmin 
+                ? `<span class="badge" style="background:#fee2e2; color:#991b1b;">Devolvida c/ Erro</span>` 
+                : `<span class="badge" style="background:#fef9c3; color:#854d0e;">Pendente</span>`;
+        } else if (emRevisao) {
+            corBorda = 'border-left: 4px solid var(--color-info);';
+            badge = `<span class="badge" style="background:#dbeafe; color:#1e40af;">Em Revisão</span>`;
+        }
+
+        html += `
+        <div class="card" style="padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; ${corBorda}">
+            <div style="flex: 1;">
+                <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px;">De: ${nomeAdmin} • ${dataFormatada}</div>
+                <h4 style="margin: 0 0 5px 0;">${t.title}</h4>
+                ${badge}
+            </div>
+            <div>
+                ${expirada
+                    ? `<button class="btn btn-secondary btn-small" disabled><i class="fa-solid fa-ban"></i> Prazo Esgotado</button>`
+                    : pendente
+                        ? `<button class="btn btn-primary btn-small" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-reply"></i> ${t.feedbackAdmin ? 'Ver Erro e Reenviar' : 'Abrir & Responder'}</button>`
+                        : emRevisao 
+                            ? `<button class="btn btn-info btn-small" onclick="abrirModalTarefa('${t.id}')" style="background: var(--color-info); color: white; border: none;"><i class="fa-solid fa-pen"></i> Editar Entrega</button>`
+                            : `<button class="btn btn-secondary btn-small" disabled><i class="fa-solid fa-check-double"></i> Aprovada</button>`
+                }
+            </div>
+        </div>`;
+    });
   
       html += `</div>`;
       container.innerHTML = html;

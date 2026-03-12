@@ -312,55 +312,56 @@ window.renderAdminCharts = function () {
   const textColor = isDark ? '#f8fafc' : '#1e293b';
   const gridColor = isDark ? '#334155' : '#e2e8f0';
 
-    const actsForStatus = getFilteredDashboardData(true, false);
-    const ctxStatus = document.getElementById('adminStatusChart');
-    if (ctxStatus) {
-        let conc = 0, and = 0, pend = 0;
-        actsForStatus.forEach((a) => {
-            if (a.status === 'concluido') conc++;
-            else if (a.status === 'andamento') and++;
-            else if (a.status === 'pendente') pend++;
-        });
+  const actsForStatus = getFilteredDashboardData(true, false);
+  const ctxStatus = document.getElementById('adminStatusChart');
+  if (ctxStatus) {
+      let conc = 0, and = 0, pend = 0, exp = 0;
+      actsForStatus.forEach((a) => {
+          if (a.status === 'concluido') conc++;
+          else if (a.status === 'andamento') and++;
+          else if (a.status === 'pendente') pend++;
+          else if (a.status === 'nao_concluido') exp++;
+      });
 
-        const statusMap = ['concluido', 'andamento', 'pendente'];
-        const activeColors = isDark 
-            ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)'] 
-            : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)'];
-            
-        const inactiveColors = isDark
-            ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)']
-            : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)'];
+      const statusMap = ['concluido', 'andamento', 'pendente', 'nao_concluido'];
+      const activeColors = isDark 
+          ? ['rgba(74, 222, 128, 0.9)', 'rgba(253, 224, 71, 0.9)', 'rgba(248, 113, 113, 0.9)', 'rgba(153, 27, 27, 0.9)'] 
+          : ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(239, 68, 68, 0.9)', 'rgba(153, 27, 27, 0.9)'];
+          
+      const inactiveColors = isDark
+          ? ['rgba(74, 222, 128, 0.15)', 'rgba(253, 224, 71, 0.15)', 'rgba(248, 113, 113, 0.15)', 'rgba(153, 27, 27, 0.15)']
+          : ['rgba(34, 197, 94, 0.2)', 'rgba(234, 179, 8, 0.2)', 'rgba(239, 68, 68, 0.2)', 'rgba(153, 27, 27, 0.2)'];
 
-        const bgStatus = statusMap.map((st, i) => {
-            if (!window.dashActiveStatus) return activeColors[i];
-            return window.dashActiveStatus === st ? activeColors[i] : inactiveColors[i];
-        });
+      const bgStatus = statusMap.map((st, i) => {
+          if (!window.dashActiveStatus) return activeColors[i];
+          return window.dashActiveStatus === st ? activeColors[i] : inactiveColors[i];
+      });
 
-        if (adminStatusChartInstance) adminStatusChartInstance.destroy();
-        adminStatusChartInstance = new Chart(ctxStatus, {
-            type: 'doughnut',
-            data: {
-                labels: ['Concluído', 'Em Andamento', 'Pendente'],
-                datasets: [{
-                    data: [conc, and, pend], 
-                    backgroundColor: bgStatus, 
-                    borderWidth: 2,
-                    borderColor: isDark ? '#1e293b' : '#ffffff',
-                }],
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                onClick: (e, elements) => {
-                    if (elements.length > 0) {
-                        const clicked = statusMap[elements[0].index];
-                        window.dashActiveStatus = (window.dashActiveStatus === clicked) ? null : clicked;
-                        refreshAdminDashboard();
-                    }
-                },
-                plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
-            }
-        });
-    }
+      if (adminStatusChartInstance) adminStatusChartInstance.destroy();
+      adminStatusChartInstance = new Chart(ctxStatus, {
+          type: 'doughnut',
+          data: {
+              labels: ['Concluído', 'Em Andamento', 'Pendente', 'Expirada'],
+              datasets: [{
+                  data: [conc, and, pend, exp], 
+                  backgroundColor: bgStatus, 
+                  borderWidth: 2,
+                  borderColor: isDark ? '#1e293b' : '#ffffff',
+              }],
+          },
+          options: {
+              responsive: true, maintainAspectRatio: false,
+              onClick: (e, elements) => {
+                  if (elements.length > 0) {
+                      const clicked = statusMap[elements[0].index];
+                      window.dashActiveStatus = (window.dashActiveStatus === clicked) ? null : clicked;
+                      refreshAdminDashboard();
+                  }
+              },
+              plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+          }
+      });
+  }
 
   const actsForCategory = getFilteredDashboardData(false, true);
   const ctxCategory = document.getElementById('adminCategoryChart');
@@ -1234,7 +1235,7 @@ function setupAdminDelegarForm() {
         </div>
         <div style="background: rgba(0,0,0,0.02); border: 1px dashed var(--color-border, #cbd5e1); border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 15px;">
             <i class="fa-solid fa-user-astronaut" style="font-size: 20px; color: var(--color-text-secondary, #64748b); margin-bottom: 8px; opacity: 0.5;"></i>
-            <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary, #64748b);">Nenhum especialista formado ainda.<br><small>Os colaboradores precisam de concluir pelo menos <strong>5 entregas</strong> para entrarem no ranking.</small></p>
+            <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary, #64748b);">Nenhuma indicação ainda.<br><small>Os colaboradores precisam de concluir pelo menos <strong>5 entregas</strong> para registrar suas estátisticas.</small></p>
         </div>`;
     }
 
@@ -1278,11 +1279,11 @@ function setupAdminDelegarForm() {
       divDif.style.display = isGamiAtiva ? 'block' : 'none'; 
       
       divDif.innerHTML = `
-          <label><i class="fa-solid fa-layer-group"></i> Dificuldade & Recompensa</label>
+          <label><i class="fa-solid fa-layer-group"></i> Dificuldade da Tarefa</label>
           <select id="delegarDificuldade" class="form-control" style="border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.05);">
-              <option value="2">Fácil (Peso 2 - 100 XP)</option>
-              <option value="3" selected>Média (Peso 3 - 150 XP)</option>
-              <option value="4">Difícil (Peso 4 - 200 XP)</option>
+              <option value="2">Fácil</option>
+              <option value="3" selected>Média</option>
+              <option value="4">Difícil</option>
           </select>
       `;
       formGroupArquivos.parentNode.insertBefore(divDif, formGroupArquivos.nextSibling);
@@ -1502,6 +1503,7 @@ window.loadTarefasEnviadas = function() {
           let badgeClass = 'badge-pendente'; let badgeText = 'Pendente'; let corBg = '#fef9c3'; let corTxt = '#854d0e';
           if (t.status === 'em_revisao') { badgeClass = 'badge-andamento'; badgeText = 'Em Revisão'; corBg = '#dbeafe'; corTxt = '#1e40af'; }
           if (t.status === 'concluido') { badgeClass = 'badge-concluido'; badgeText = 'Aprovada'; corBg = '#dcfce7'; corTxt = '#166534'; }
+          if (t.status === 'nao_concluido') { badgeClass = 'badge-pendente'; badgeText = 'Expirada'; corBg = '#fee2e2'; corTxt = '#991b1b'; }
           
           const categoriaBadge = `<span class="badge cat-badge-dynamic" style="${getCategoryStyleString(t.category || 'Geral')}">${t.category || 'Geral'}</span>`;
 

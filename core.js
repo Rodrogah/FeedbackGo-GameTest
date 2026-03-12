@@ -46,6 +46,11 @@ if (isFirstLoad && loadState.emp && loadState.usr && loadState.act) {
   if (typeof window.processAutoLogin === 'function') {
       window.processAutoLogin();
   }
+
+  setTimeout(() => { 
+    if (typeof window.verificarTarefasExpiradas === 'function') window.verificarTarefasExpiradas(); 
+}, 3000);
+
 } else if (!isFirstLoad) {
   refreshLiveData();
 }
@@ -483,13 +488,15 @@ const p = ds.split('-');
 return `${p[2]}/${p[1]}/${p[0]}`;
 }
 function getStatusBadge(s) {
-const b = {
-  concluido: '<span class="badge badge-concluido">Concluído</span>',
-  andamento: '<span class="badge badge-andamento">Em Andamento</span>',
-  pendente: '<span class="badge badge-pendente">Pendente</span>',
-};
-return b[s] || s;
-}
+    const b = {
+      concluido: '<span class="badge badge-concluido">Concluído</span>',
+      andamento: '<span class="badge badge-andamento">Em Andamento</span>',
+      pendente: '<span class="badge badge-pendente">Pendente</span>',
+      em_revisao: '<span class="badge" style="background:#dbeafe; color:#1e40af;">Em Revisão</span>',
+      nao_concluido: '<span class="badge" style="background:#fee2e2; color:#991b1b; border: 1px solid #f87171;"><i class="fa-solid fa-clock-rotate-left"></i> Expirada</span>',
+    };
+    return b[s] || s;
+    }
 function updateCurrentDate(id) {
 const el = document.getElementById(id);
 if (el) {
@@ -1344,4 +1351,83 @@ window.marcarNotificacoesComoLidas = function() {
         });
         if(contador > 0) batch.commit();
     });
+};
+
+// =======================================================
+// MOTOR DE SLA CORPORATIVO (JUÍZO DE PRAZOS ÀS 00:00)
+// =======================================================
+window.verificarTarefasExpiradas = async function() {
+    if (!currentUser) return;
+    const hojeLocal = getLocalToday(); // Formato "YYYY-MM-DD"
+    let batch = db.batch();
+    let countExpiradas = 0;
+
+    // 1. Varredura nas Atividades Comuns (Tarefas próprias do funcionário)
+    const minhasAtividades = activities.filter(a => 
+        String(a.userId) === String(currentUser.id) && 
+        (a.status === 'pendente' || a.status === 'andamento') &&
+        a.date < hojeLocal
+    );
+
+    minhasAtividades.forEach(a => {
+        const ref = db.collection('atividades').doc(String(a.id));
+        batch.update(ref, { status: 'nao_concluido' });
+        countExpiradas++;
+        
+        let logs = a.logs || [];
+        logs.push({ date: new Date().toISOString(), userName: 'Sistema (SLA Automático)', from: a.status, to: 'nao_concluido' });
+        batch.update(ref, { logs: logs });
+    });
+
+    // 2. Varredura nas Tarefas Delegadas pelo Gestor
+    try {
+        const snapTarefas = await db.collection('tarefas')
+            .where('userId', '==', currentUser.id)
+            .where('status', 'in', ['pendente', 'andamento'])
+            .get();
+
+        snapTarefas.forEach(doc => {
+            const t = doc.data();
+            const dataCriacao = t.createdAt.split('T')[0]; 
+            
+            // Se o prazo expirou (criou ontem ou antes e não entregou)
+            if (dataCriacao < hojeLocal) {
+                batch.update(doc.ref, { status: 'nao_concluido' });
+                countExpiradas++;
+
+                // 🔥 A MÁGICA DO HISTÓRICO: O Robô copia a tarefa reprovada para a tabela geral de Atividades!
+                const idNovaAtiv = Date.now() + Math.floor(Math.random() * 10000);
+                const refAtiv = db.collection('atividades').doc(String(idNovaAtiv));
+                
+                batch.set(refAtiv, {
+                    ...t,
+                    id: idNovaAtiv,
+                    date: hojeLocal, // A data em que o sistema marcou a falha
+                    status: 'nao_concluido',
+                    xpEarned: 0,
+                    tarefaVinculadaId: String(t.id), // Mantém a ligação à tarefa original
+                    logs: [{ 
+                        date: new Date().toISOString(), 
+                        userName: 'Sistema (SLA Automático)', 
+                        from: t.status, 
+                        to: 'nao_concluido' 
+                    }]
+                });
+            }
+        });
+
+        // Se encontrou irregularidades, o Juiz bate o martelo e salva no banco!
+        if (countExpiradas > 0) {
+            await batch.commit();
+            console.warn(`[SLA] O Sistema expirou ${countExpiradas} tarefas não concluídas à meia-noite.`);
+            
+            // Atualiza a interface gráfica em tempo real
+            if (typeof refreshLiveData === 'function') refreshLiveData();
+            if (typeof loadTarefasRecebidas === 'function') loadTarefasRecebidas();
+            
+            showToast(`${countExpiradas} tarefa(s) expiraram o prazo da meia-noite!`, 'error');
+        }
+    } catch (error) {
+        console.error("[SLA] Erro ao processar expiração de tarefas:", error);
+    }
 };
