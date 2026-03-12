@@ -1254,7 +1254,7 @@ function setupAdminDelegarForm() {
     </div>`;
 
     container.innerHTML = htmlFinal;
-};np
+};
 
   const selectCategoria = novoForm.querySelector('#delegarCategoria');
   if (selectCategoria) {
