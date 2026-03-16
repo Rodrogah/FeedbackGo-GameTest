@@ -1,0 +1,158 @@
+<div id="adminDashboard">
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div>
+        <h1><i class="fa-solid fa-gauge"></i> Dashboard</h1>
+        <p id="adminCurrentDate"></p>
+    </div>
+    
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Equipe">
+            <i class="fa-solid fa-users" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterTeam" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todas as Equipes</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Colaborador">
+            <i class="fa-solid fa-user" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterUser" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todos Usuários</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Filtrar por Categoria">
+            <i class="fa-solid fa-tags" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <select id="dashFilterCategory" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+                <option value="">Todas Categorias</option>
+            </select>
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Inicial">
+            <i class="fa-solid fa-calendar-day" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="dashFilterStartDate" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <div style="background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" title="Data Final">
+            <i class="fa-solid fa-calendar-check" style="color: var(--color-text-secondary); font-size: 13px;"></i>
+            <input type="date" id="dashFilterEndDate" onchange="refreshAdminDashboard()" style="border: none; background: transparent; font-weight: 600; font-size: 13px; cursor: pointer; outline: none; color: var(--color-text-primary);">
+        </div>
+
+        <button onclick="clearAllDashFilters()" title="Limpar Filtros" style="background: transparent; border: 1px dashed var(--color-border); color: var(--color-text-secondary); border-radius: 8px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+          <i class="fa-solid fa-eraser"></i>
+      </button>
+
+    </div>
+</div>
+
+  <div
+    class="stats-grid"
+    style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))"
+  >
+    <div class="stat-card">
+      <div class="value" id="dashTotalActivities">0</div>
+      <div class="label">Total de Registros</div>
+    </div>
+    <div class="stat-card success">
+      <div class="value" id="dashCompletedActivities">0</div>
+      <div class="label">Concluídas</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="value" id="dashPendingActivities">0</div>
+      <div class="label">Pendentes / Em Atraso</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="value" id="dashActiveUsers">0</div>
+      <div class="label">Colaboradores Ativos</div>
+    </div>
+  </div>
+
+  <div class="form-grid" style="margin-bottom: 24px">
+    <div
+      class="card"
+      style="
+        margin-bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      "
+    >
+      <h3 style="width: 100%">
+        <i class="fa-solid fa-chart-pie"></i> Status Geral
+      </h3>
+      <div style="position: relative; height: 260px; width: 100%">
+        <canvas id="adminStatusChart"></canvas>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom: 0">
+      <h3 style="width: 100%">
+        <i class="fa-solid fa-chart-column"></i> Produtividade por Categoria
+      </h3>
+      <div style="position: relative; height: 260px; width: 100%">
+        <canvas id="adminCategoryChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-grid" style="margin-bottom: 24px">
+    <div class="card" style="margin-bottom: 0">
+      <h3 style="width: 100%">
+        <i class="fa-solid fa-chart-line"></i> Resumo Semanal
+      </h3>
+      <div style="position: relative; height: 260px; width: 100%">
+        <canvas id="adminTimelineChart"></canvas>
+      </div>
+    </div>
+
+    <div
+      class="card"
+      style="margin-bottom: 0; display: flex; flex-direction: column"
+    >
+      <h3 style="width: 100%">
+        <i class="fa-solid fa-bullhorn" style="color: #3b82f6"></i> Quadro de
+        Avisos Geral
+      </h3>
+      <p
+        style="
+          font-size: 12px;
+          color: var(--color-text-secondary);
+          margin-bottom: 12px;
+        "
+      >
+        Este recado ficará visível no painel de todos os colaboradores.
+      </p>
+      <textarea
+        id="adminAnnouncementText"
+        placeholder="Escreva aqui um recado importante para toda a empresa..."
+        style="
+          flex-grow: 1;
+          resize: none;
+          min-height: 140px;
+          margin-bottom: 12px;
+        "
+      ></textarea>
+      <button
+        onclick="saveAnnouncement()"
+        id="btnSaveAnnouncement"
+        class="btn btn-small btn-info"
+        style="align-self: flex-end"
+      >
+        <i class="fa-solid fa-paper-plane"></i> Publicar Aviso
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>
+      <i class="fa-solid fa-bolt"></i> Atividades Recentes
+    </h3>
+    <div id="adminRecentActivities"></div>
+  </div>
+</div>
+
+<div class="card" style="border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.03);">
+  <div id="rankingAdminContainer"></div>
+</div>
+<script>
+  setTimeout(() => renderRankingMensal('rankingAdminContainer'), 1000);
+</script>

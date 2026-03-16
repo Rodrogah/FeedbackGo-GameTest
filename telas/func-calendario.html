@@ -1,0 +1,112 @@
+<div id="funcCalendarView">
+    <div class="page-header" style="justify-content: space-between; display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <h1><i class="fa-solid fa-calendar-days"></i> Meu Calendário</h1>
+    </div>
+    
+    <div class="alert alert-info" style="margin-bottom: 24px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--color-text-primary);">
+        <i class="fa-solid fa-circle-info" style="color: var(--color-info);"></i> Aqui podes visualizar todos os teus eventos pessoais e os eventos importantes partilhados pela empresa.
+    </div>
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="filters" style="margin-bottom: 0;">
+            <div class="form-group" style="flex: 1; min-width: 200px;">
+                <label>Categoria do Evento</label>
+                <select id="filtroCalendarioCategoriaFunc" onchange="window.filtrarCalendarioFunc()">
+                    <option value="">Todas as Categorias</option>
+                    <!-- options geradas pelo JS -->
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0; min-width: auto; align-items: flex-end; display: flex;">
+                <button type="button" class="btn btn-primary" onclick="window.filtrarCalendarioFunc()"><i class="fa-solid fa-filter"></i> Filtrar</button>
+            </div>
+        </div>
+    </div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div id="calendarAreaFunc" style="padding: 15px; border-radius: 8px;"></div>
+    </div>
+
+    <!-- Modal Novo/Editar Evento Funcionario -->
+    <div id="modalEventoFunc" class="modal-overlay hidden" style="z-index: 99999;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalEventoTituloFunc"><i class="fa-solid fa-calendar-plus"></i> Novo Evento Pessoal</h2>
+                <button type="button" class="close-modal" onclick="window.fecharModalEventoFunc()">&times;</button>
+            </div>
+            <form id="formEventoFunc" onsubmit="event.preventDefault(); window.salvarEventoFunc();">
+                <input type="hidden" id="eventoIdFunc">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Título do Evento</label>
+                        <input type="text" id="eventoTituloFunc" required placeholder="Ex: Tarefa Focada">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Descrição (Opcional)</label>
+                        <textarea id="eventoDescricaoFunc" rows="1"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Data/Hora Início</label>
+                        <input type="datetime-local" id="eventoInicioFunc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Data/Hora Fim</label>
+                        <input type="datetime-local" id="eventoFimFunc" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Categoria do Evento</label>
+                        <select id="eventoCategoriaFunc" required>
+                            <!-- options geradas pelo JS -->
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Cor do Evento</label>
+                        <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;" id="eventoCoresFunc">
+                            <label class="color-picker-label" style="background: #3b82f6;"><input type="radio" name="eventoCorFunc" value="#3b82f6" checked style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #10b981;"><input type="radio" name="eventoCorFunc" value="#10b981" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #f59e0b;"><input type="radio" name="eventoCorFunc" value="#f59e0b" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #ef4444;"><input type="radio" name="eventoCorFunc" value="#ef4444" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #8b5cf6;"><input type="radio" name="eventoCorFunc" value="#8b5cf6" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #ec4899;"><input type="radio" name="eventoCorFunc" value="#ec4899" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #14b8a6;"><input type="radio" name="eventoCorFunc" value="#14b8a6" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #f43f5e;"><input type="radio" name="eventoCorFunc" value="#f43f5e" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #a855f7;"><input type="radio" name="eventoCorFunc" value="#a855f7" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #0ea5e9;"><input type="radio" name="eventoCorFunc" value="#0ea5e9" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #64748b;"><input type="radio" name="eventoCorFunc" value="#64748b" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                            <label class="color-picker-label" style="background: #0f172a;"><input type="radio" name="eventoCorFunc" value="#0f172a" style="position: absolute; opacity: 0; cursor: pointer;"></label>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                    <button type="button" id="btnApagarEventoFunc" class="btn btn-danger btn-small hidden" onclick="window.apagarEventoFunc()"><i class="fa-solid fa-trash"></i> Apagar</button>
+                    <div style="display: flex; gap: 10px; margin-left: auto;">
+                        <button type="button" class="btn btn-secondary btn-small" onclick="window.fecharModalEventoFunc()">Cancelar</button>
+                        <button type="submit" class="btn btn-small" id="btnSalvarEventoFunc"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Ver Evento -->
+    <div id="modalVerEventoFunc" class="modal-overlay hidden" style="z-index: 99999;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-circle-info"></i> Detalhes do Evento</h2>
+                <button type="button" class="close-modal" onclick="window.fecharModalVerEventoFunc()">&times;</button>
+            </div>
+            <div style="margin-top: 15px;">
+                <h3 id="verEventoTituloFunc" style="margin-bottom: 5px; color: var(--color-primary);"></h3>
+                <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 15px;"><i class="fa-solid fa-user"></i> Criado por: <strong id="verEventoCriadorFunc"></strong></p>
+                <div style="background: var(--color-bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p><strong>Início:</strong> <span id="verEventoInicioFunc"></span></p>
+                    <p style="margin-top: 5px;"><strong>Fim:</strong> <span id="verEventoFimFunc"></span></p>
+                </div>
+                <div id="verEventoDescricaoBoxFunc" style="display: none;">
+                    <label style="font-weight: bold; font-size: 12px; text-transform: uppercase;">Descrição:</label>
+                    <p id="verEventoDescricaoTextoFunc" style="margin-top: 5px; font-size: 14px; white-space: pre-wrap;"></p>
+                </div>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="window.fecharModalVerEventoFunc()">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
