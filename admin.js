@@ -150,6 +150,10 @@ async function showAdminSection(sec) {
       if (userFilter) userFilter.innerHTML = '<option value="">Todos os Colaboradores</option>' + users.filter((u) => u.companyId === c.id).map((u) => `<option value="${u.id}">${u.name}</option>`).join('');
       const catFilter = document.getElementById('reportFilterCategory');
       if (catFilter) catFilter.innerHTML = '<option value="">Todas as Categorias</option>' + (typeof buildCategorySelectOptions === 'function' ? buildCategorySelectOptions(c.categories || defaultCategories) : '');
+      
+      // Força a renderização inicial após popular os filtros
+      if (typeof generateReport === 'function') generateReport();
+      if (typeof reportUpdateCount === 'function') reportUpdateCount();
     } else if (sec === 'store') {
       if (typeof setupAdminStore === 'function') setupAdminStore();
     } else if (sec === 'settings') {
@@ -189,6 +193,7 @@ window.refreshAdminDashboard = function () {
   updateAdminStats();
   loadAdminRecentActivities();
   if (typeof renderAdminCharts === 'function') renderAdminCharts();
+  if (typeof window.updateTaskCompletionChart === 'function') window.updateTaskCompletionChart();
   
   if (typeof window.renderRankingMensal === 'function') {
       window.renderRankingMensal('rankingAdminContainer');
@@ -526,7 +531,10 @@ window.getFilteredReportData = function () {
   
   if (s) f = f.filter((a) => a.date >= s);
   if (e) f = f.filter((a) => a.date <= e);
-  if (cat) f = f.filter((a) => a.category === cat); 
+  if (cat) {
+    const norm = (str) => (str || '').replace(/::/g, '-').replace(/\s+/g, '').toLowerCase();
+    f = f.filter((a) => norm(a.category) === norm(cat));
+  } 
   if (search) {
       f = f.filter((a) => 
           (a.title && a.title.toLowerCase().includes(search)) || 
@@ -827,34 +835,49 @@ function setupAdminNewTaskForm() {
 function setupNewUserForm() {
   const form = document.getElementById('newUserForm');
   if (!form) return;
-  form.addEventListener('submit', function (e) {
+  form.addEventListener('submit', async function (e) {
     e.preventDefault();
     const em = document.getElementById('newUserEmail').value.trim();
     if (users.find((u) => u.email === em))
       return showToast('E-mail já em uso.', 'error');
 
-    let nId = nextUserId;
-    const nUser = {
-      id: nId,
-      companyId: currentUser.companyId,
-      name: document.getElementById('newUserName').value.trim(),
-      email: em,
-      password: document.getElementById('newUserPassword').value,
-      role: document.getElementById('newUserRole')
-        ? document.getElementById('newUserRole').value
-        : 'funcionario',
-      active: true,
-      team: document.getElementById('newUserTeam').value,
-    };
-    db.collection('usuarios')
-      .doc(nId.toString())
-      .set(nUser)
-      .then(() => {
-        form.reset();
-        if (typeof sendWelcomeEmail === 'function')
-          sendWelcomeEmail(nUser.name, nUser.email, nUser.password);
-        showToast('Colaborador criado!');
-      });
+    const rawPass = document.getElementById('newUserPassword').value;
+
+    try {
+      // Cria a conta no Firebase Auth (a senha fica no backend, nunca no Firestore)
+      const cred = await firebase.auth().createUserWithEmailAndPassword(em, rawPass);
+      const authUid = cred.user.uid;
+
+      let nId = Date.now();
+      const nUser = {
+        id: nId,
+        authUid: authUid,
+        companyId: currentUser.companyId,
+        name: document.getElementById('newUserName').value.trim(),
+        email: em,
+        role: document.getElementById('newUserRole')
+          ? document.getElementById('newUserRole').value
+          : 'funcionario',
+        active: true,
+        team: document.getElementById('newUserTeam').value,
+      };
+      await Promise.all([
+        db.collection('usuarios').doc(nId.toString()).set(nUser),
+        db.collection('usuarioAuth').doc(authUid).set({
+            userId: nUser.id,
+            companyId: nUser.companyId,
+            role: nUser.role
+        }),
+      ]);
+
+      form.reset();
+      if (typeof sendWelcomeEmail === 'function')
+        sendWelcomeEmail(nUser.name, nUser.email);
+      showToast('Colaborador criado!');
+    } catch (err) {
+      console.error('Erro ao criar colaborador:', err);
+      showToast('Erro ao criar colaborador: ' + (err.message || 'tente novamente'), 'error');
+    }
   });
 }
 
@@ -913,16 +936,24 @@ function setupAdminSettingsForms() {
 
   const profForm = document.getElementById('admProfileForm');
   if (profForm) {
-    profForm.addEventListener('submit', function (e) {
+    profForm.addEventListener('submit', async function (e) {
       e.preventDefault();
       const newName = document.getElementById('admProfileName').value.trim();
       const newPass = document.getElementById('admProfilePassword').value;
       const btn = profForm.querySelector('button');
       if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
 
-      let updates = {};
-      if (newName) updates.name = newName;
-      if (newPass) updates.password = newPass;
+      let updates = { name: newName };
+      if (newPass) {
+          // A senha é alterada no Firebase Auth (nunca gravada no Firestore)
+          try {
+              await firebase.auth().currentUser.updatePassword(newPass);
+          } catch (err) {
+              showNotice('admProfileAlert', 'Erro ao alterar senha: ' + (err.message || 'tente novamente'), 'error');
+              if (btn) btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Atualizar';
+              return;
+          }
+      }
 
       db.collection('usuarios')
         .doc(currentUser.id.toString())
@@ -961,11 +992,164 @@ window.openSettingsTab = function (tabId, btnElement) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+let taskCompletionChartInstance = null;
+
+window.onTaskChartPeriodChange = function() {
+  const periodSel = document.getElementById('taskChartPeriodFilter');
+  const dateInput = document.getElementById('taskChartSpecificDate');
+  if (dateInput) {
+    dateInput.style.display = (periodSel && periodSel.value === 'custom_day') ? 'inline-block' : 'none';
+  }
+  window.updateTaskCompletionChart();
+};
+
+window.updateTaskCompletionChart = function() {
+  const canvas = document.getElementById('taskCompletionChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  // Atualizar select de pessoas (colaboradores)
+  const userSelect = document.getElementById('taskChartUserFilter');
+  if (userSelect && currentUser) {
+    const currentVal = userSelect.value;
+    const companyUsers = (users || []).filter(u => u.companyId === currentUser.companyId && u.active !== false);
+    
+    let userHTML = '<option value="">Todas as Pessoas</option>';
+    companyUsers.forEach(u => {
+      const selected = String(u.id) === String(currentVal) ? 'selected' : '';
+      userHTML += `<option value="${u.id}" ${selected}>${u.name}</option>`;
+    });
+    userSelect.innerHTML = userHTML;
+  }
+
+  // Filtrar atividades base
+  let acts = (activities || []).filter(a => a.companyId === currentUser.companyId && (a.status === 'concluido' || !a.status));
+
+  // Filtro por Pessoa
+  const selectedUserId = userSelect ? userSelect.value : '';
+  if (selectedUserId) {
+    acts = acts.filter(a => String(a.userId) === String(selectedUserId));
+  }
+
+  // Filtro por Período
+  const periodSel = document.getElementById('taskChartPeriodFilter');
+  const selectedPeriod = periodSel ? periodSel.value : 'all';
+
+  const now = new Date();
+  const todayStr = getLocalToday();
+
+  if (selectedPeriod === 'today') {
+    acts = acts.filter(a => a.date === todayStr);
+  } else if (selectedPeriod === 'week') {
+    const curr = new Date();
+    const firstDay = new Date(curr.setDate(curr.getDate() - curr.getDay()));
+    const firstDayStr = firstDay.toISOString().split('T')[0];
+    acts = acts.filter(a => a.date >= firstDayStr);
+  } else if (selectedPeriod === 'month') {
+    const monthStr = todayStr.substring(0, 7); // YYYY-MM
+    acts = acts.filter(a => a.date && a.date.startsWith(monthStr));
+  } else if (selectedPeriod === 'year') {
+    const yearStr = todayStr.substring(0, 4); // YYYY
+    acts = acts.filter(a => a.date && a.date.startsWith(yearStr));
+  } else if (selectedPeriod === 'custom_day') {
+    const dateInput = document.getElementById('taskChartSpecificDate');
+    const specificDate = dateInput ? dateInput.value : '';
+    if (specificDate) {
+      acts = acts.filter(a => a.date === specificDate);
+    }
+  }
+
+  // Agrupar por Título da Atividade -> Somar Volume
+  const volumeByTask = {};
+  acts.forEach(a => {
+    const title = a.title || 'Sem título';
+    const vol = Number(a.quantidade || a.volume || a.qtd || 1);
+    volumeByTask[title] = (volumeByTask[title] || 0) + (isNaN(vol) ? 1 : vol);
+  });
+
+  const taskTitles = Object.keys(volumeByTask).sort((a, b) => volumeByTask[b] - volumeByTask[a]); // Ordena do maior para o menor
+  const volumes = taskTitles.map(t => volumeByTask[t]);
+
+  const ctx = canvas.getContext('2d');
+  if (taskCompletionChartInstance) {
+    taskCompletionChartInstance.destroy();
+  }
+
+  const isDark = document.body.classList.contains('dark-mode');
+  const textColor = isDark ? '#94a3b8' : '#64748b';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+  // Paleta de cores vibrantes para as barras
+  const barColors = [
+    'rgba(99, 102, 241, 0.85)',
+    'rgba(16, 185, 129, 0.85)',
+    'rgba(245, 158, 11, 0.85)',
+    'rgba(239, 68, 68, 0.85)',
+    'rgba(168, 85, 247, 0.85)',
+    'rgba(14, 165, 233, 0.85)',
+    'rgba(236, 72, 153, 0.85)',
+    'rgba(20, 184, 166, 0.85)'
+  ];
+  const bgColors = taskTitles.map((_, i) => barColors[i % barColors.length]);
+
+  taskCompletionChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: taskTitles.length ? taskTitles : ['Nenhuma atividade encontrada'],
+      datasets: [{
+        label: 'Volume Entregue',
+        data: volumes.length ? volumes : [0],
+        backgroundColor: bgColors,
+        borderRadius: 8,
+        borderWidth: 0,
+        maxBarThickness: 50
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: function(context) {
+              return ` Volume Total Entregue: ${context.parsed.y}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { 
+            color: textColor,
+            font: { weight: 'bold', size: 11 },
+            maxRotation: 45,
+            minRotation: 0
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: { color: textColor, precision: 0 }
+        }
+      }
+    }
+  });
+};
+
 window.generateReport = function () {
+  const filtered = getFilteredReportData();
   document.getElementById('periodReport').innerHTML = generateActivityTableHTML(
-    getFilteredReportData(),
+    filtered,
     true
   );
+  if (typeof window.updateTaskCompletionChart === 'function') {
+    window.updateTaskCompletionChart();
+  }
 };
 window.downloadReportExcel = function () {
   const a = getFilteredReportData();
@@ -1134,44 +1318,43 @@ function setupAdminDelegarForm() {
             if (s.score < 30) qualidadeVisual = "⭐⭐⭐";
 
             infoEstatisticas = `
-            <div style="font-size: 11px; color: var(--color-text-primary); margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(130, 130, 130, 0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+            <div class="assignee-stats">
                 <span title="Quantas vezes realizou o serviço">
-                    <strong style="opacity: 0.7; font-weight: 600;"><i class="fa-solid fa-rotate-right"></i> Fez:</strong> 
-                    <span style="font-weight: 800;">${s.vezes}x</span>
+                    <strong><i class="fa-solid fa-rotate-right"></i> Fez:</strong>
+                    <b>${s.vezes}x</b>
                 </span>
                 <span title="A sua média individual de entregas">
-                    <strong style="opacity: 0.7; font-weight: 600;"><i class="fa-solid fa-calculator"></i> Sua Média:</strong> 
-                    <span style="font-weight: 900; color: var(--color-primary);">${s.mediaQtd.toFixed(1)}</span>
+                    <strong><i class="fa-solid fa-calculator"></i> Sua Média:</strong>
+                    <b>${s.mediaQtd.toFixed(1)}</b>
                 </span>
                 <span title="Comparado à média de todos (${mediaGlobal.toFixed(1)})">
-                    <strong style="opacity: 0.7; font-weight: 600;"><i class="fa-solid fa-users"></i> Equipe:</strong> 
+                    <strong><i class="fa-solid fa-users"></i> Equipe:</strong>
                     ${tagDesempenho}
                 </span>
                 <span title="Qualidade Baseada na Performance">
-                    <strong style="opacity: 0.7; font-weight: 600;"><i class="fa-solid fa-gem"></i> Qualidade:</strong> 
+                    <strong><i class="fa-solid fa-gem"></i> Qualidade:</strong>
                     ${qualidadeVisual}
                 </span>
             </div>`;
         } else if (s.vezes > 0 && s.vezes < 5) {
             infoEstatisticas = `
-            <div style="font-size: 11px; color: #854d0e; background: #fef9c3; margin-top: 8px; padding: 8px; border-radius: 6px; border: 1px dashed #fcd34d; font-weight: 600;">
-                <i class="fa-solid fa-hourglass-half"></i> Em fase de calibragem: <span style="color: #854d0e !important; font-weight: 900;">${s.vezes} de 5</span> entregas realizadas. (Aguardando mais dados).
+            <div class="assignee-note assignee-note--calib">
+                <i class="fa-solid fa-hourglass-half"></i> Em fase de calibragem: <b>${s.vezes} de 5</b> entregas realizadas. (Aguardando mais dados).
             </div>`;
         } else {
-            infoEstatisticas = `<div style="font-size: 11px; color: var(--color-text-secondary); margin-top: 8px; opacity: 0.6;"><i class="fa-solid fa-circle-info"></i> Nunca realizou este serviço.</div>`;
+            infoEstatisticas = `<div class="assignee-note assignee-note--empty"><i class="fa-solid fa-circle-info"></i> Nunca realizou este serviço.</div>`;
         }
 
-        const bordaDestaque = isIndicado ? 'border: 1px solid var(--color-success); background: rgba(16, 185, 129, 0.05);' : '';
-        const seloIndicado = isIndicado ? `<span style="background: #10b981; color: white; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);"><i class="fa-solid fa-award"></i> Indicado</span>` : '';
+        const seloIndicado = isIndicado ? `<span class="assignee-seal"><i class="fa-solid fa-award"></i> Indicado</span>` : '';
 
         return `
-        <div style="margin-bottom: 8px;">
+        <div style="margin-bottom: 2px;">
             <input type="checkbox" name="funcDelegado" value="${u.id}" id="checkFunc_${u.id}" class="input-hidden" style="display: none;">
-            <label for="checkFunc_${u.id}" class="green-dot-item" style="cursor: pointer; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; transition: 0.2s; ${bordaDestaque}">
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
+            <label for="checkFunc_${u.id}" class="assignee-card ${isIndicado ? 'assignee-card--indicado' : ''}">
+                <div class="assignee-card__row">
+                    <div class="assignee-card__who">
                         <div class="dot"></div>
-                        <span style="font-size: 14px; color: var(--color-text-primary);"><strong>${u.name}</strong> <small style="opacity:0.7">(${u.team || 'Sem Equipe'})</small></span>
+                        <span><strong>${esc(u.name)}</strong> <small>(${esc(u.team || 'Sem Equipe')})</small></span>
                     </div>
                     ${seloIndicado}
                 </div>
@@ -1184,11 +1367,9 @@ function setupAdminDelegarForm() {
 
         // 1. TÍTULO E LINHA DOS INDICADOS (Agora aparece Sempre!)
         htmlFinal += `
-        <div style="display: flex; align-items: center; margin: 15px 0 10px 0; width: 100%;">
-            <span style="font-size: 12px; font-weight: 900; color: var(--color-success); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; margin-right: 15px;">
-                <i class="fa-solid fa-ranking-star"></i> Pessoas Indicadas
-            </span>
-            <div style="flex-grow: 1; height: 1px; background-color: var(--color-border);"></div>
+        <div class="section-divider">
+            <span class="is-primary"><i class="fa-solid fa-ranking-star"></i> Pessoas Indicadas</span>
+            <div class="section-divider__line"></div>
         </div>`;
 
         // 2. RENDERIZA OS INDICADOS OU MOSTRA MENSAGEM DE AVISO
@@ -1197,20 +1378,18 @@ function setupAdminDelegarForm() {
         } else {
             // Placeholder elegante para quando ninguém atingiu as 5 tarefas ainda
             htmlFinal += `
-            <div style="background: rgba(0,0,0,0.02); border: 1px dashed var(--color-border); border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 15px;">
-                <i class="fa-solid fa-user-astronaut" style="font-size: 20px; color: var(--color-text-secondary); margin-bottom: 8px; opacity: 0.5;"></i>
-                <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary);">Nenhum especialista formado ainda.<br><small>Os colaboradores precisam de concluir pelo menos <strong>5 entregas</strong> para entrarem no ranking.</small></p>
+            <div class="team-empty">
+                <i class="fa-solid fa-user-astronaut"></i>
+                <p style="margin: 0;">Nenhum especialista formado ainda.<br><small>Os colaboradores precisam de concluir pelo menos <strong>5 entregas</strong> para entrarem no ranking.</small></p>
             </div>`;
         }
 
         // 3. TÍTULO E LINHA DOS OUTROS COLABORADORES (Aparece Sempre!)
         if (outros.length > 0) {
             htmlFinal += `
-            <div style="display: flex; align-items: center; margin: 25px 0 10px 0; width: 100%;">
-                <span style="font-size: 12px; font-weight: 800; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; margin-right: 15px;">
-                    <i class="fa-solid fa-users"></i> Outros Colaboradores
-                </span>
-                <div style="flex-grow: 1; height: 1px; background-color: var(--color-border);"></div>
+            <div class="section-divider">
+                <span class="is-muted"><i class="fa-solid fa-users"></i> Outros Colaboradores</span>
+                <div class="section-divider__line"></div>
             </div>`;
             
             htmlFinal += outros.map(u => gerarCard(u, false)).join('');
@@ -1345,6 +1524,7 @@ function setupAdminDelegarForm() {
               btn.disabled = false;
               
               renderizarListaInteligente(); // Reseta o algoritmo após o envio
+              if (typeof fecharNovaTarefa === 'function') fecharNovaTarefa();
               
               if (typeof loadTarefasEnviadas === 'function') loadTarefasEnviadas(); 
           }).catch((err) => {
@@ -1463,18 +1643,18 @@ window.loadTarefasEnviadas = function() {
           const nomeFunc = func ? func.name : 'Removido';
           const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
           
-          let badgeClass = 'badge-pendente'; let badgeText = 'Pendente'; let corBg = '#fef9c3'; let corTxt = '#854d0e';
-          if (t.status === 'em_revisao') { badgeClass = 'badge-andamento'; badgeText = 'Em Revisão'; corBg = '#dbeafe'; corTxt = '#1e40af'; }
-          if (t.status === 'concluido') { badgeClass = 'badge-concluido'; badgeText = 'Aprovada'; corBg = '#dcfce7'; corTxt = '#166534'; }
+          let badgeClass = 'status-badge--pendente'; let badgeText = 'Pendente';
+          if (t.status === 'em_revisao') { badgeClass = 'status-badge--revisao'; badgeText = 'Em Revisão'; }
+          if (t.status === 'concluido') { badgeClass = 'status-badge--concluida'; badgeText = 'Aprovada'; }
           
-          const categoriaBadge = `<span class="badge cat-badge-dynamic" style="${getCategoryStyleString(t.category || 'Geral')}">${t.category || 'Geral'}</span>`;
+          const categoriaBadge = `<span class="badge cat-badge-dynamic" style="${getCategoryStyleString(t.category || 'Geral')}">${esc(t.category || 'Geral')}</span>`;
 
           html += `<tr>
               <td>${dataFormatada}</td>
-              <td><strong>${nomeFunc}</strong></td>
+              <td><strong>${esc(nomeFunc)}</strong></td>
               <td>${categoriaBadge}</td>
-              <td>${t.title}</td>
-              <td><span class="badge ${badgeClass}" style="background:${corBg}; color:${corTxt};">${badgeText}</span></td>
+              <td>${esc(t.title)}</td>
+              <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
               <td style="display:flex; gap:5px;">
                   ${t.status === 'pendente' ? `<button onclick="abrirEditarTarefa('${t.id}')" class="btn-icon-only edit" title="Corrigir Instruções"><i class="fa-solid fa-pen"></i></button>` : ''}
                   ${t.status === 'em_revisao' ? `<button onclick="abrirDetalhesTarefa('${t.id}')" class="btn-icon-only" title="Revisar Entrega" style="color: var(--color-info); background: rgba(59,130,246,0.1);"><i class="fa-solid fa-magnifying-glass"></i></button>` : ''}
@@ -1514,7 +1694,7 @@ window.abrirDetalhesTarefa = function(idTarefa) {
       if (t.attachments && t.attachments.length > 0) {
           let html = '<strong style="font-size:13px; display:block; margin-bottom: 5px;">Anexos da Entrega (Baixar):</strong><div style="display: flex; gap: 10px; flex-wrap: wrap;">';
           t.attachments.forEach(an => {
-              html += `<a href="${an.url}" download="${an.name}" class="badge" style="background: var(--color-bg-secondary); color: var(--color-primary); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border);"><i class="fa-solid fa-download"></i> ${an.name}</a>`;
+              html += `<a href="${escAttr(an.url)}" download="${escAttr(an.name)}" class="badge" style="background: var(--color-bg-secondary); color: var(--color-primary); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border);"><i class="fa-solid fa-download"></i> ${esc(an.name)}</a>`;
           });
           html += '</div>';
           boxAnexos.innerHTML = html;
@@ -1523,13 +1703,16 @@ window.abrirDetalhesTarefa = function(idTarefa) {
       }
       
       const areaRevisao = document.getElementById('areaRevisaoAdmin');
-      const btnFechar = document.getElementById('btnFecharDetalhes');
+      const ftrRevisao = document.getElementById('footerRevisaoDetalhes');
+      const ftrFechar = document.getElementById('footerFecharDetalhes');
       if (t.status === 'em_revisao') {
-          areaRevisao.style.display = 'block';
-          btnFechar.style.display = 'none';
+          if (areaRevisao) areaRevisao.style.display = 'block';
+          if (ftrRevisao) ftrRevisao.style.display = 'flex';
+          if (ftrFechar) ftrFechar.style.display = 'none';
       } else {
-          areaRevisao.style.display = 'none';
-          btnFechar.style.display = 'block';
+          if (areaRevisao) areaRevisao.style.display = 'none';
+          if (ftrRevisao) ftrRevisao.style.display = 'none';
+          if (ftrFechar) ftrFechar.style.display = 'flex';
       }
 
       document.getElementById('modalDetalhesTarefa').classList.remove('hidden');
@@ -1672,6 +1855,24 @@ window.fecharEditarTarefa = function() {
   document.getElementById('modalEditarTarefaDelegada').classList.add('hidden');
 };
 
+// ==========================================
+// JANELA UNIFICADA: CRIAR NOVA TAREFA (Modal)
+// ==========================================
+window.abrirNovaTarefa = function() {
+  const modal = document.getElementById('modalNovaTarefa');
+  if (!modal) return;
+  const catEl = document.getElementById('delegarCategoria');
+  if (catEl && catEl.options.length <= 1 && typeof buildCategorySelectOptions === 'function') {
+      const c = companies.find(x => x.id === currentUser.companyId);
+      catEl.innerHTML = buildCategorySelectOptions(c ? c.categories : defaultCategories);
+  }
+  modal.classList.remove('hidden');
+};
+window.fecharNovaTarefa = function() {
+  const modal = document.getElementById('modalNovaTarefa');
+  if (modal) modal.classList.add('hidden');
+};
+
 window.salvarEdicaoTarefa = function() {
   const id = document.getElementById('editDelegarId').value;
   const titulo = document.getElementById('editDelegarTitulo').value;
@@ -1698,17 +1899,10 @@ window.openDelegarTab = function(tabId, btn) {
   });
   
   document.querySelectorAll('.nav-delegar-tab').forEach(b => {
-      b.style.background = 'transparent';
-      b.style.color = 'var(--color-text-secondary)';
-      b.style.border = '1px solid var(--color-border)';
       b.classList.remove('active');
   });
 
   document.getElementById(tabId).style.display = 'block';
-
-  btn.style.background = 'var(--color-primary)';
-  btn.style.color = 'white';
-  btn.style.border = '1px solid var(--color-primary)';
   btn.classList.add('active');
 
   if(tabId === 'tabTarefasEnviadas') {
@@ -1827,8 +2021,107 @@ window.openStoreTab = function(tabId, btn) {
   if (tabId === 'tabResgates') loadAdminRedemptions();
 };
 
+// ── Helpers for the new prize-creator form ──────────────────────────────────
+
+window.updateLivePreview = function () {
+    const titleEl = document.getElementById('livePreviewTitle');
+    const inputName = document.getElementById('rewardName');
+    if (titleEl && inputName) {
+        titleEl.textContent = inputName.value.trim() || 'Nome do Prêmio';
+    }
+
+    const selectEl = document.getElementById('livePreviewSelect');
+    if (selectEl) {
+        let taxaCambio = 10;
+        if (typeof currentUser !== 'undefined' && currentUser && currentUser.companyId && typeof companies !== 'undefined') {
+            const c = companies.find(x => String(x.id) === String(currentUser.companyId));
+            if (c && c.giftCardConfig && c.giftCardConfig.rate) {
+                taxaCambio = c.giftCardConfig.rate;
+            }
+        }
+        if (window._rewardValues && window._rewardValues.length > 0) {
+            selectEl.innerHTML = '<option value="" disabled selected>Escolha o valor...</option>' +
+                window._rewardValues.map(v => {
+                    const custo = Math.round(v * taxaCambio);
+                    return `<option value="${v}">R$ ${v} (${custo} GoCoins)</option>`;
+                }).join('');
+        } else {
+            selectEl.innerHTML = '<option value="">Escolha o valor...</option>';
+        }
+    }
+};
+
+window.previewRewardImage = function (event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const preview = document.getElementById('rewardImagePreview');
+        const placeholder = document.getElementById('rewardImagePlaceholder');
+        if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+        if (placeholder) placeholder.style.display = 'none';
+        const hidden = document.getElementById('rewardImageBase64');
+        if (hidden) hidden.value = e.target.result;
+
+        // Sync live preview
+        const liveImg = document.getElementById('livePreviewImg');
+        const liveIcon = document.getElementById('livePreviewDefaultIcon');
+        if (liveImg) { liveImg.src = e.target.result; liveImg.style.display = 'block'; }
+        if (liveIcon) liveIcon.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+};
+
+window._rewardValues = [];
+
+window.addRewardValue = function () {
+    const input = document.getElementById('rewardValueInput');
+    if (!input) return;
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) return;
+    if (window._rewardValues.includes(val)) { input.value = ''; return; }
+    window._rewardValues.push(val);
+    window._rewardValues.sort((a, b) => a - b);
+    renderRewardChips();
+    updateLivePreview();
+    input.value = '';
+    input.focus();
+};
+
+window.removeRewardValue = function (val) {
+    window._rewardValues = window._rewardValues.filter(v => v !== val);
+    renderRewardChips();
+    updateLivePreview();
+};
+
+function renderRewardChips() {
+    const container = document.getElementById('rewardValuesChips');
+    if (!container) return;
+    container.innerHTML = window._rewardValues.map(v =>
+        `<span onclick="removeRewardValue(${v})" style="display:inline-flex; align-items:center; gap:5px; padding:5px 14px; border-radius:20px; background:var(--color-primary); color:#fff; font-size:13px; font-weight:600; cursor:pointer; user-select:none; transition:opacity 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">R$ ${v} <i class="fa-solid fa-xmark" style="font-size:10px;"></i></span>`
+    ).join('');
+}
+
+window.selectRewardCodigo = function (temCodigo) {
+    const simBtn = document.getElementById('rewardCodigoSim');
+    const naoBtn = document.getElementById('rewardCodigoNao');
+    const hidden = document.getElementById('rewardTemCodigo');
+    if (!simBtn || !naoBtn) return;
+    if (temCodigo) {
+        simBtn.style.background = 'var(--color-primary)'; simBtn.style.color = '#fff';
+        naoBtn.style.background = 'var(--color-bg-secondary)'; naoBtn.style.color = 'var(--color-text-secondary)';
+    } else {
+        naoBtn.style.background = 'var(--color-primary)'; naoBtn.style.color = '#fff';
+        simBtn.style.background = 'var(--color-bg-secondary)'; simBtn.style.color = 'var(--color-text-secondary)';
+    }
+    if (hidden) hidden.value = temCodigo ? 'true' : 'false';
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.setupAdminStore = function() {
   loadAdminRewards();
+  window._rewardValues = [];
 
   const form = document.getElementById('adminNewRewardForm');
   if (!form) return;
@@ -1837,6 +2130,10 @@ window.setupAdminStore = function() {
 
   novoForm.addEventListener('submit', function(e) {
       e.preventDefault();
+      if (window._rewardValues.length === 0) {
+          showToast('Adicione pelo menos um valor ao prêmio.', 'error');
+          return;
+      }
       const btn = novoForm.querySelector('button[type="submit"]');
       const originalText = btn.innerHTML;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Guardar...';
@@ -1846,8 +2143,9 @@ window.setupAdminStore = function() {
           id: Date.now(),
           companyId: currentUser.companyId,
           nome: document.getElementById('rewardName').value.trim(),
-          preco: parseInt(document.getElementById('rewardPrice').value),
-          descricao: document.getElementById('rewardDesc').value.trim(),
+          valores: [...window._rewardValues],
+          temCodigo: document.getElementById('rewardTemCodigo')?.value === 'true',
+          imagemBase64: document.getElementById('rewardImageBase64')?.value || '',
           ativo: true,
           createdAt: new Date().toISOString()
       };
@@ -1855,6 +2153,21 @@ window.setupAdminStore = function() {
       db.collection('premios').doc(premio.id.toString()).set(premio).then(() => {
           showToast('Prêmio adicionado ao catálogo!');
           novoForm.reset();
+          window._rewardValues = [];
+          const chips = document.getElementById('rewardValuesChips');
+          if (chips) chips.innerHTML = '';
+          const preview = document.getElementById('rewardImagePreview');
+          if (preview) { preview.src = ''; preview.style.display = 'none'; }
+          const placeholder = document.getElementById('rewardImagePlaceholder');
+          if (placeholder) placeholder.style.display = 'flex';
+          const hidden = document.getElementById('rewardImageBase64');
+          if (hidden) hidden.value = '';
+          const liveImg = document.getElementById('livePreviewImg');
+          const liveIcon = document.getElementById('livePreviewDefaultIcon');
+          if (liveImg) { liveImg.src = ''; liveImg.style.display = 'none'; }
+          if (liveIcon) liveIcon.style.display = 'block';
+          selectRewardCodigo(true);
+          updateLivePreview();
           loadAdminRewards();
           btn.innerHTML = originalText;
           btn.disabled = false;
@@ -1879,24 +2192,41 @@ window.loadAdminRewards = function() {
       
       let premios = [];
       snap.forEach(doc => premios.push(doc.data()));
-      premios.sort((a, b) => a.preco - b.preco);
+      premios.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
       let html = '';
       premios.forEach(p => {
           const btnStatus = p.ativo 
               ? `<button class="btn btn-small" style="background:#fca5a5; color:#7f1d1d; border:none;" onclick="togglePremioStatus(${p.id}, false)">Ocultar</button>`
               : `<button class="btn btn-small" style="background:#86efac; color:#14532d; border:none;" onclick="togglePremioStatus(${p.id}, true)">Mostrar na Loja</button>`;
-          
+
+          const valoresHtml = Array.isArray(p.valores) && p.valores.length
+              ? p.valores.map(v => `<span style="padding:2px 8px; border-radius:10px; background:var(--color-primary); color:#fff; font-size:11px; font-weight:700;">R$ ${v}</span>`).join(' ')
+              : (p.preco ? `<span style="padding:2px 8px; border-radius:10px; background:var(--color-primary); color:#fff; font-size:11px; font-weight:700;">${p.preco} Coins</span>` : '—');
+
+          const imgHtml = p.imagemBase64
+              ? `<img src="${p.imagemBase64}" style="width:44px; height:44px; border-radius:8px; object-fit:contain; background:var(--color-bg-tertiary,#eee); flex-shrink:0; margin-right:12px;">`
+              : `<div style="width:44px; height:44px; border-radius:8px; background:var(--color-bg-tertiary,rgba(0,0,0,0.07)); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-right:12px;"><i class="fa-solid fa-gift" style="color:var(--color-primary); font-size:18px;"></i></div>`;
+
+          const codigoBadge = p.temCodigo
+              ? `<span style="font-size:10px; padding:2px 7px; border-radius:8px; background:#dbeafe; color:#1e40af; font-weight:600;">Com código</span>`
+              : `<span style="font-size:10px; padding:2px 7px; border-radius:8px; background:#f3f4f6; color:#6b7280; font-weight:600;">Sem código</span>`;
+
           html += `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:15px; border:1px solid var(--color-border); border-radius:8px; background: ${p.ativo ? 'var(--color-bg-secondary)' : 'rgba(0,0,0,0.05)'}; opacity: ${p.ativo ? '1' : '0.6'}; transition: 0.2s;">
-              <div style="flex: 1;">
-                  <h4 style="margin:0 0 5px 0; color: var(--color-text-primary);"><i class="fa-solid fa-gift" style="color: var(--color-primary); margin-right: 5px;"></i> ${p.nome}</h4>
-                  <p style="margin:0; font-size:12px; color:var(--color-text-secondary);">${p.descricao || 'Sem descrição detalhada.'}</p>
-                  <span style="display:inline-block; margin-top:8px; font-weight:800; color:#b45309; background:#fef3c7; padding:4px 10px; border-radius:12px; font-size:12px;"><i class="fa-solid fa-coins"></i> ${p.preco} Coins</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border:1px solid var(--color-border); border-radius:10px; background: ${p.ativo ? 'var(--color-bg-secondary)' : 'rgba(0,0,0,0.05)'}; opacity: ${p.ativo ? '1' : '0.6'}; transition: 0.2s;">
+              <div style="display:flex; align-items:center; flex:1; min-width:0; gap:8px;">
+                  ${imgHtml}
+                  <div style="flex:1; min-width:0;">
+                      <h4 style="margin:0 0 3px 0; font-size:13px; color:var(--color-text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.nome}</h4>
+                      <div style="display:flex; flex-wrap:wrap; gap:3px; align-items:center;">
+                          ${valoresHtml}
+                          ${codigoBadge}
+                      </div>
+                  </div>
               </div>
-              <div style="display: flex; gap: 8px;">
+              <div style="display:flex; gap:6px; flex-shrink:0; margin-left:8px;">
                   ${btnStatus}
-                  <button class="btn btn-small btn-danger" onclick="excluirPremio(${p.id})"><i class="fa-solid fa-trash"></i></button>
+                  <button class="btn btn-small btn-danger" style="padding:4px 8px;" onclick="excluirPremio(${p.id})"><i class="fa-solid fa-trash" style="font-size:11px;"></i></button>
               </div>
           </div>`;
       });
@@ -1928,24 +2258,39 @@ window.loadAdminRedemptions = function() {
           return;
       }
       
-      let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
-      snap.forEach(doc => {
-          const r = doc.data();
+      let lista = [];
+      snap.forEach(doc => lista.push(doc.data()));
+      lista.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+      lista.forEach(r => {
           const func = users.find(u => u.id === r.userId);
           const nomeFunc = func ? func.name : 'Colaborador';
           const dataPedido = new Date(r.createdAt).toLocaleDateString('pt-BR');
 
           html += `
-          <div style="border-left: 4px solid var(--color-warning); background: var(--color-bg-secondary); padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-              <div>
-                  <div style="font-size: 11px; color: var(--color-text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">🗓️ Pedido em: ${dataPedido}</div>
-                  <h4 style="margin: 0 0 5px 0; color: var(--color-text-primary);">${r.premioNome}</h4>
-                  <p style="margin:0 0 3px 0; font-size: 13px; color: var(--color-text-secondary);"><strong>Colaborador:</strong> ${nomeFunc}</p>
-                  <p style="margin:0; font-size: 13px;"><strong>Custo de Resgate:</strong> <i class="fa-solid fa-coins" style="color:#fbbf24;"></i> ${r.preco} Coins</p>
+          <div style="border: 1px solid var(--color-border); background: var(--color-bg-secondary); padding: 12px 16px 12px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; position: relative; overflow: hidden;">
+              <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #f59e0b; border-radius: 10px 0 0 10px;"></div>
+              <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+                  <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                      <i class="fa-solid fa-gift" style="font-size: 16px; color: #d97706;"></i>
+                  </div>
+                  <div style="min-width: 0;">
+                      <p style="margin: 0 0 3px 0; font-size: 14px; font-weight: 700; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.premioNome}</p>
+                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--color-text-secondary);">
+                          <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-calendar-day" style="font-size:11px;"></i> ${dataPedido}</span>
+                          <span style="opacity:0.4;">•</span>
+                          <span style="display:inline-flex; align-items:center; gap:4px;"><i class="fa-solid fa-user" style="font-size:11px;"></i> ${nomeFunc}</span>
+                          <span style="opacity:0.4;">•</span>
+                          <span style="color: #d97706; font-weight: 700; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); padding: 1px 7px; border-radius: 4px; display:inline-flex; align-items:center; gap:4px;">
+                              <img src="Patentes/Moedas/GoCoins.svg" alt="" style="width:13px; height:13px; object-fit:contain;"> ${r.preco} GoCoins
+                          </span>
+                      </div>
+                  </div>
               </div>
-              <div style="display: flex; gap: 8px;">
-                  <button class="btn btn-small btn-success" onclick="aprovarResgate(${r.id}, ${r.preco})"><i class="fa-solid fa-check"></i> Entregue</button>
-                  <button class="btn btn-small btn-danger" onclick="recusarResgate(${r.id}, ${r.userId}, ${r.preco})"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+              <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                  <button class="btn btn-small btn-success" onclick="aprovarResgate(${r.id}, ${r.preco})" style="display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:5px 12px; border-radius:6px;"><i class="fa-solid fa-check" style="font-size:11px;"></i> Entregue</button>
+                  <button class="btn btn-small btn-danger" onclick="recusarResgate(${r.id}, ${r.userId}, ${r.preco})" style="display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:5px 12px; border-radius:6px;"><i class="fa-solid fa-xmark" style="font-size:11px;"></i> Cancelar</button>
               </div>
           </div>`;
       });
@@ -1955,6 +2300,88 @@ window.loadAdminRedemptions = function() {
 };
 
 window.aprovarResgate = function(resgateId, preco) {
+  db.collection('resgates').doc(resgateId.toString()).get().then(async docResgate => {
+      if (!docResgate.exists) {
+          showToast('Resgate não encontrado.', 'error');
+          return;
+      }
+      const rData = docResgate.data();
+
+      // Verificar se exige código PIN
+      const nomeResgateLower = (rData.premioNome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const temPalavraSemCodigo = nomeResgateLower.includes('sem codigo') || nomeResgateLower.includes('semcodigo');
+
+      let exigeCodigo = false;
+      if (rData.tipo === 'giftcard') {
+          exigeCodigo = true;
+      } else if (rData.tipo === 'interno') {
+          if (temPalavraSemCodigo || rData.temCodigo === false) {
+              exigeCodigo = false;
+          } else {
+              // Buscar no cadastro de prêmios se exige código
+              try {
+                  const snapP = await db.collection('premios').where('companyId', '==', currentUser.companyId).get();
+                  let premioCadastrado = null;
+                  if (!snapP.empty) {
+                      snapP.forEach(docP => {
+                          const p = docP.data();
+                          const nomeCoincide = rData.premioNome && p.nome && (rData.premioNome.startsWith(p.nome) || p.nome.startsWith(rData.premioNome) || rData.premioNome.includes(p.nome));
+                          const idCoincide = rData.premioId && String(p.id) === String(rData.premioId);
+                          if (nomeCoincide || idCoincide) {
+                              premioCadastrado = p;
+                          }
+                      });
+                  }
+                  if (premioCadastrado) {
+                      exigeCodigo = (premioCadastrado.temCodigo === true);
+                  } else {
+                      exigeCodigo = (rData.temCodigo === true && !temPalavraSemCodigo);
+                  }
+              } catch (err) {
+                  console.error('Erro ao verificar temCodigo no Firestore:', err);
+                  exigeCodigo = (rData.temCodigo === true && !temPalavraSemCodigo);
+              }
+          }
+      }
+
+      // Se NÃO exigir código (Prêmio sem código = Não)
+      if (rData.tipo === 'interno' && !exigeCodigo) {
+          const funcNome = rData.userName || 'o colaborador';
+          showConfirm(`Confirma a entrega do prêmio <strong>${rData.premioNome}</strong> para <strong>${funcNome}</strong>?`, () => {
+              db.collection('resgates').doc(resgateId.toString()).update({
+                  status: 'aprovado',
+                  dataAprovacao: new Date().toISOString(),
+                  codigoResgate: '',
+                  voucherCode: ''
+              }).then(() => {
+                  db.collection('notificacoes').add({
+                      userId: rData.userId,
+                      titulo: '🎁 O Seu prêmio foi entregue!',
+                      mensagem: `O seu prêmio ${rData.premioNome} foi entregue com sucesso!`,
+                      createdAt: new Date().toISOString(),
+                      acaoAlvo: 'resgates',
+                      lida: false
+                  });
+
+                  showToast('Prêmio entregue com sucesso!', 'success');
+                  loadAdminRedemptions();
+              }).catch(err => {
+                  console.error('Erro ao aprovar:', err);
+                  showToast('Erro ao aprovar.', 'error');
+              });
+          }, '🎁 Confirmar Entrega', '<i class="fa-solid fa-check"></i> Confirmar Entrega', 'btn-success');
+          return;
+      }
+
+      // Caso exija código PIN
+      abrirModalPinResgateRoot(resgateId, preco, rData);
+  }).catch(err => {
+      console.error('Erro ao buscar resgate:', err);
+      showToast('Erro ao buscar resgate.', 'error');
+  });
+};
+
+function abrirModalPinResgateRoot(resgateId, preco, rData) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.style.zIndex = '999999';
@@ -1996,22 +2423,15 @@ window.aprovarResgate = function(resgateId, preco) {
           codigoResgate: pinCode 
       }).then(() => {
           db.collection('empresas').doc(currentUser.companyId.toString()).get().then(docEmpresa => {
-              let bank = docEmpresa.data().companyBank || 0;
+              let bank = docEmpresa.data() ? (docEmpresa.data().companyBank || 0) : 0;
               db.collection('empresas').doc(currentUser.companyId.toString()).update({ companyBank: bank - preco }).then(() => {
-                  
-                  // 🔥 GATILHO DA NOTIFICAÇÃO DE PIN ENTREGUE COM REDIRECIONAMENTO
-                  db.collection('resgates').doc(resgateId.toString()).get().then(docResgate => {
-                      const donoDoResgate = docResgate.data().userId;
-                      const nomeDoPremio = docResgate.data().premioNome;
-                      
-                      db.collection('notificacoes').add({
-                          userId: donoDoResgate,
-                          titulo: '🎁 O Seu prêmio chegou!',
-                          mensagem: `O Seu Gift Card ${nomeDoPremio} já está disponível!`,
-                          createdAt: new Date().toISOString(),
-                          acaoAlvo: 'resgates',
-                          lida: false
-                      });
+                  db.collection('notificacoes').add({
+                      userId: rData.userId,
+                      titulo: '🎁 O Seu prêmio chegou!',
+                      mensagem: `O Seu Gift Card ${rData.premioNome} já está disponível!`,
+                      createdAt: new Date().toISOString(),
+                      acaoAlvo: 'resgates',
+                      lida: false
                   });
 
                   showToast('Resgate aprovado e PIN enviado com sucesso!');
@@ -2076,7 +2496,7 @@ window.setupAdminGamification = function() {
           const orcamentoMensal = data.monthlyBudget || 500;
           if (document.getElementById('adminMonthlyBudget')) document.getElementById('adminMonthlyBudget').value = orcamentoMensal;
 
-          const configLoja = data.giftCardConfig || { rate: 10, active: ['uber', 'netflix', 'xbox', 'spotify', 'playstation', 'steam'] };
+          const configLoja = data.giftCardConfig || { rate: 10, active: [] };
           if (document.getElementById('gamiExchangeRate')) document.getElementById('gamiExchangeRate').value = configLoja.rate;
           window.updateExchangeRateHelp(configLoja.rate);
 
@@ -2110,6 +2530,17 @@ window.setupAdminGamification = function() {
                   document.getElementById(id).value = regras[finalKey];
               }
           });
+
+          // Progressão de níveis reflete automaticamente as alterações dos campos
+          if (typeof window.renderGamiProgressionTable === 'function') {
+              if (!window.__gamiProgressionBound) {
+                  window.__gamiProgressionBound = true;
+                  document.querySelectorAll('#gamiSettingsArea input').forEach(inp => {
+                      inp.addEventListener('input', () => window.renderGamiProgressionTable());
+                  });
+              }
+              window.renderGamiProgressionTable();
+          }
           
           if (document.getElementById('gamiToggleIcon')) document.getElementById('gamiToggleIcon').style.color = isAtiva ? 'var(--color-success)' : 'var(--color-danger)';
           if (document.getElementById('gamiToggleText')) document.getElementById('gamiToggleText').innerText = isAtiva ? 'Gamificação Ativada' : 'Gamificação Desativada';
@@ -2134,6 +2565,12 @@ window.alternarChaveGamificacao = function(checkboxElement) {
 };
 
 window.salvarRegrasGamificacao = function(btnElement) {
+  const invalidos = (typeof window.validarCamposGamificacao === 'function') ? window.validarCamposGamificacao() : [];
+  if (invalidos.length) {
+      if (typeof showToast === 'function') showToast('Valores inválidos: ' + invalidos.join(', '), 'error');
+      return;
+  }
+
   const txtOriginal = btnElement.innerHTML;
   btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
   btnElement.disabled = true;
@@ -2175,6 +2612,8 @@ window.salvarRegrasGamificacao = function(btnElement) {
           companies[compIndex].giftCardConfig = novaConfigLoja;
       }
 
+      if (typeof window.renderGamiProgressionTable === 'function') window.renderGamiProgressionTable();
+
       showToast('Configurações da Loja atualizadas!');
       btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Salvo!';
       
@@ -2183,6 +2622,150 @@ window.salvarRegrasGamificacao = function(btnElement) {
       showToast('Erro ao salvar!', 'error');
       btnElement.innerHTML = txtOriginal; btnElement.disabled = false;
   });
+};
+
+// =========================================================
+// GESTÃO DE CONFIGURAÇÕES DE GAMIFICAÇÃO (VALIDACAO + PROGRESSÃO)
+// =========================================================
+const CAMPOS_GAMIFICACAO_ADMIN = [
+  { id: 'gamiXpBase', min: 10, max: null, label: 'XP Base' },
+  { id: 'gamiXpNivel', min: 50, max: null, label: 'XP por Nível' },
+  { id: 'gamiCoinsNivel', min: 0, max: null, label: 'GoCoins por Nível' },
+  { id: 'gamiPesoFacil', min: 0.5, max: 10, label: 'Peso Fácil' },
+  { id: 'gamiPesoMedia', min: 0.5, max: 10, label: 'Peso Média' },
+  { id: 'gamiPesoDificil', min: 0.5, max: 10, label: 'Peso Difícil' },
+  { id: 'gamiPremioTop1', min: 0, max: null, label: 'Prêmio 1º Lugar' },
+  { id: 'gamiPremioTop2', min: 0, max: null, label: 'Prêmio 2º Lugar' },
+  { id: 'gamiPremioTop3', min: 0, max: null, label: 'Prêmio 3º Lugar' },
+  { id: 'gamiPremioTop4', min: 0, max: null, label: 'Prêmio 4º Lugar' },
+  { id: 'gamiPremioTop5', min: 0, max: null, label: 'Prêmio 5º Lugar' },
+  { id: 'gamiExchangeRate', min: 1, max: null, label: 'Taxa de Câmbio' },
+  { id: 'adminMonthlyBudget', min: 0, max: null, label: 'Orçamento Mensal' }
+];
+
+window.validarCamposGamificacao = function() {
+  const invalidos = [];
+  CAMPOS_GAMIFICACAO_ADMIN.forEach(cfg => {
+      const el = document.getElementById(cfg.id);
+      if (!el) return;
+      const val = parseFloat(el.value);
+      const ok = !isNaN(val) && (cfg.min === null || val >= cfg.min) && (cfg.max === null || val <= cfg.max);
+      el.style.borderColor = ok ? '' : '#ef4444';
+      el.style.outline = ok ? '' : '1px solid #ef4444';
+      if (!ok) invalidos.push(cfg.label);
+  });
+  const msg = document.getElementById('gamiInvalidMsg');
+  if (msg) {
+      msg.style.display = invalidos.length ? 'flex' : 'none';
+      msg.innerHTML = invalidos.length ? '<i class="fa-solid fa-triangle-exclamation"></i> Corrija: ' + invalidos.join(', ') : '';
+  }
+  return invalidos;
+};
+
+window.renderGamiProgressionTable = function() {
+  const valor = (id, fallback) => {
+      const el = document.getElementById(id);
+      const v = el ? parseFloat(el.value) : NaN;
+      return (el && !isNaN(v)) ? v : fallback;
+  };
+
+  const xpBase = valor('gamiXpBase', 50);
+  const xpNivel = valor('gamiXpNivel', 500);
+  const coinsNivel = valor('gamiCoinsNivel', 100);
+  const pesoFacil = valor('gamiPesoFacil', 2);
+  const pesoMedia = valor('gamiPesoMedia', 3);
+  const pesoDificil = valor('gamiPesoDificil', 4);
+  const rate = valor('gamiExchangeRate', 10);
+
+  const xpFacil = Math.round(xpBase * pesoFacil);
+  const xpMedia = Math.round(xpBase * pesoMedia);
+  const xpDificil = Math.round(xpBase * pesoDificil);
+  const tarefasPorNivel = xpMedia > 0 ? Math.max(1, Math.ceil(xpNivel / xpMedia)) : 1;
+  const custoGift50 = Math.round(rate * 50);
+
+  const setChip = (id, txt) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = txt;
+  };
+  setChip('gamiChipFacil', String(xpFacil));
+  setChip('gamiChipTarefas', String(tarefasPorNivel));
+  setChip('gamiChipGift50', String(custoGift50));
+
+  const PATENTES_LOCAIS = window.PATENTES || [
+      { minLevel: 1, nome: 'Recruta', imagem: 'Patentes/Recruta.svg', icone: 'fa-solid fa-seedling', cor: '#CD7F32' },
+      { minLevel: 3, nome: 'Aprendiz', imagem: 'Patentes/Aprendiz.svg', icone: 'fa-solid fa-book-open', cor: '#C0C0C0' },
+      { minLevel: 5, nome: 'Operacional', imagem: 'Patentes/Operacional.svg', icone: 'fa-solid fa-gears', cor: '#FFD700' },
+      { minLevel: 8, nome: 'Especialista', imagem: 'Patentes/Especialista.svg', icone: 'fa-solid fa-star', cor: '#E5E4E2' },
+      { minLevel: 12, nome: 'Veterano', imagem: 'Patentes/Veterano.svg', icone: 'fa-solid fa-shield-halved', cor: '#878681' },
+      { minLevel: 17, nome: 'Elite', imagem: 'Patentes/Elite.svg', icone: 'fa-solid fa-fire', cor: '#A7D8DE' },
+      { minLevel: 23, nome: 'Mestre', imagem: 'Patentes/Mestre.svg', icone: 'fa-solid fa-gem', cor: '#50C878' },
+      { minLevel: 30, nome: 'Grão-Mestre', imagem: 'Patentes/Gr%C3%A3o-Mestre.svg', icone: 'fa-solid fa-crown', cor: '#0F52BA' },
+      { minLevel: 40, nome: 'Lenda', imagem: 'Patentes/Lenda.svg', icone: 'fa-solid fa-bolt-lightning', cor: '#B9F2FF' },
+      { minLevel: 50, nome: 'Lenda Suprema', imagem: 'Patentes/Lenda%20Suprema.svg', icone: 'fa-solid fa-dragon', cor: '#E0115F' }
+  ];
+
+  const patenteDoNivel = (nivel) => {
+      let patente = PATENTES_LOCAIS[0];
+      for (let i = PATENTES_LOCAIS.length - 1; i >= 0; i--) {
+          if (nivel >= PATENTES_LOCAIS[i].minLevel) { patente = PATENTES_LOCAIS[i]; break; }
+      }
+      return patente;
+  };
+  const totalNiveis = PATENTES_LOCAIS[PATENTES_LOCAIS.length - 1].minLevel;
+
+  let linhas = '';
+  for (let i = 1; i <= totalNiveis; i++) {
+      const p = patenteDoNivel(i);
+      const emblemaNovo = p.minLevel === i;
+      const xpAcumulado = (i - 1) * xpNivel;
+      const coinsAcumulados = (i - 1) * coinsNivel;
+      linhas += `
+      <tr style="border-bottom: 1px solid var(--color-border);${emblemaNovo ? ' background: rgba(16, 185, 129, 0.06);' : ''}">
+        <td style="padding: 8px 10px; white-space: nowrap; font-weight: 700; font-size: 13px;">Nv ${i}${emblemaNovo ? ' <span style="background: rgba(16, 185, 129, 0.15); color: var(--color-primary); font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 8px; margin-left: 4px; white-space: nowrap;">novo emblema</span>' : ''}</td>
+        <td style="padding: 8px 10px; white-space: nowrap;">${p.imagem ? `<img src="${p.imagem}" style="width: 20px; height: 20px; object-fit: contain; vertical-align: middle; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none'">` : `<i class="${p.icone}" style="color: ${p.cor}; width: 18px;"></i>`} <span style="font-weight: 800; font-size: 13px; color: var(--color-text-primary);">${p.nome}</span></td>
+        <td style="padding: 8px 10px; text-align: center; font-size: 13px; color: var(--color-text-secondary);">${xpAcumulado.toLocaleString('pt-BR')} XP</td>
+        <td style="padding: 8px 10px; text-align: center; white-space: nowrap; font-weight: 800; font-size: 13px; color: var(--color-primary);">${coinsAcumulados.toLocaleString('pt-BR')} GoCoins</td>
+      </tr>`;
+  }
+
+  const tabela = document.getElementById('gamiProgressionTable');
+  if (tabela) {
+      tabela.innerHTML = `
+      <table style="width: 100%; border-collapse: collapse; min-width: 480px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden;">
+        <thead>
+          <tr style="background: var(--color-bg-secondary);">
+            <th style="padding: 9px 10px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-secondary);">Nível</th>
+            <th style="padding: 9px 10px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-secondary);">Emblema</th>
+            <th style="padding: 9px 10px; text-align: center; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-secondary);">XP acumulado</th>
+            <th style="padding: 9px 10px; text-align: center; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-secondary);">GoCoins acumulados</th>
+          </tr>
+        </thead>
+        <tbody>${linhas}</tbody>
+      </table>
+      <p style="font-size: 11px; color: var(--color-text-secondary); margin-top: 10px;">
+        <i class="fa-solid fa-circle-info"></i> ${totalNiveis} níveis • ${PATENTES_LOCAIS.length} emblemas: ${PATENTES_LOCAIS.map(p => `${p.nome} (Nv ${p.minLevel})`).join(', ')}. Referência: tarefa fácil = <strong>${xpFacil} XP</strong>, média = <strong>${xpMedia} XP</strong>, difícil = <strong>${xpDificil} XP</strong> — cada nível exige ${xpNivel.toLocaleString('pt-BR')} XP.
+      </p>`;
+  }
+};
+
+window.restaurarPadraoGamificacao = function() {
+  const padraro = {
+      gamiXpBase: 50, gamiXpNivel: 500, gamiCoinsNivel: 100,
+      gamiPesoFacil: 2, gamiPesoMedia: 3, gamiPesoDificil: 4,
+      gamiPremioTop1: 500, gamiPremioTop2: 400, gamiPremioTop3: 300, gamiPremioTop4: 200, gamiPremioTop5: 100
+  };
+  Object.keys(padraro).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = padraro[id];
+  });
+  const rate = document.getElementById('gamiExchangeRate');
+  if (rate) rate.value = 10;
+  const budget = document.getElementById('adminMonthlyBudget');
+  if (budget) budget.value = 500;
+
+  if (typeof window.updateExchangeRateHelp === 'function') window.updateExchangeRateHelp(10);
+  if (typeof window.renderGamiProgressionTable === 'function') window.renderGamiProgressionTable();
+  if (typeof showToast === 'function') showToast('Valores padrão restaurados. Clique em Guardar para aplicar.');
 };
 
 const genVar = (count) => Array.from({length: count}, (_, i) => `variant${String(i+1).padStart(2, '0')}`);
@@ -2304,7 +2887,7 @@ window.carregarPerfilEAvatar = function() {
   window.charSessionActive = true; 
 };
 
-window.salvarPerfilStudio = function(btnElement) {
+window.salvarPerfilStudio = async function(btnElement) {
   const txtOriginal = btnElement.innerHTML;
   btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
   btnElement.disabled = true;
@@ -2323,13 +2906,21 @@ window.salvarPerfilStudio = function(btnElement) {
 
   if (!novoNome) { showToast('O nome não pode ficar vazio!', 'error'); btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return; }
 
+  if (novaSenha) {
+      // A senha é alterada no Firebase Auth (nunca gravada no Firestore)
+      try {
+          await firebase.auth().currentUser.updatePassword(novaSenha);
+      } catch (err) {
+          showToast('Erro ao alterar senha: ' + (err.message || 'tente novamente'), 'error');
+          btnElement.innerHTML = txtOriginal; btnElement.disabled = false; return;
+      }
+  }
+
   const updates = { name: novoNome };
-  if (novaSenha) updates.password = novaSenha;
   if (novoAvatar) updates.avatarUrl = novoAvatar;
 
   db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
       currentUser.name = novoNome;
-      if (novaSenha) currentUser.password = novaSenha;
       if (novoAvatar) currentUser.avatarUrl = novoAvatar;
 
       const uIndex = users.findIndex(x => x.id === currentUser.id);

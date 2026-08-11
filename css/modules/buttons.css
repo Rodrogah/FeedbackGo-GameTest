@@ -1,0 +1,88 @@
+/* ============ BOTÕES ============ */
+.btn {
+  padding: 12px 20px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn-secondary {
+  background: var(--color-text-secondary);
+}
+
+.btn-secondary:hover {
+  background: #475569;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-info {
+  background: var(--color-info);
+}
+
+.btn-info:hover {
+  background: #2563eb;
+}
+
+.btn-success {
+  background: var(--color-success);
+}
+
+.btn-success:hover {
+  background: #059669;
+}
+
+.btn-icon-only {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  transition: 0.2s;
+}
+
+.btn-icon-only:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.btn-icon-only.edit:hover {
+  color: var(--color-info);
+}
+
+.btn-icon-only.delete:hover {
+  color: var(--color-danger);
+}
+

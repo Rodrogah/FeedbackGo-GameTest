@@ -1,0 +1,217 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // FUNÇÕES DE APOIO
+    // ============================================================
+
+    // Sessão Firebase Auth ativa (o app agora usa Firebase Auth de verdade)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Mapa authUid -> { userId (numérico legado), companyId, role }
+    // Usado porque a coleção `usuarios` é chaveada por id numérico (Date.now())
+    function myAuth() {
+      return get(/databases/$(database)/documents/usuarioAuth/$(request.auth.uid)).data;
+    }
+
+    // Usuário autenticado e com mapeamento válido
+    function isActive() {
+      return isAuthenticated() && myAuth() != null;
+    }
+
+    function isAdmin() {
+      return isActive() && (myAuth().role == 'admin' || myAuth().role == 'hibrido');
+    }
+
+    // O usuário autenticado pertence à empresa informada
+    function isFromCompany(companyId) {
+      return isActive() && myAuth().companyId == companyId;
+    }
+
+    // O usuário autenticado É o dono do documento (id numérico legado)
+    function isSelf(userId) {
+      return isActive() && myAuth().userId == userId;
+    }
+
+    // O usuário autenticado é dono da lista de tarefas referenciada
+    function isOwnerOfList(listId) {
+      return get(/databases/$(database)/documents/todo_lists/$(listId)).data.userId == myAuth().userId;
+    }
+
+    // ============================================================
+    // NOTA DE ARQUITETURA (decisão "alinhado ao app"):
+    // O app é uma base única global (baseado nuvem). Muitas telas carregam
+    // as coleções inteiras (empresas, usuarios, atividades) e filtram
+    // client-side, e várias consultas filtram por campos não-empresa
+    // (userId, senderId, authUid). Por isso as LEITURAS exigem apenas
+    // autenticação, mantendo o app funcional e bloqueando acesso anônimo.
+    // As ESCRITAS continuam validadas por mapeamento authUid + role/empresa.
+    // ============================================================
+
+    // ============================================================
+    // COLEÇÃO: usuarioAuth (mapeamento authUid -> usuário legado)
+    // ============================================================
+    // O app só grava neste doc (nunca lê client-side); read self-only por segurança.
+    // Imutável após a criação — impede escalada de privilégio alterando role/companyId
+    match /usuarioAuth/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      // SELF-create SÓ como colaborador (sem escalada de role/companyId).
+      // Admin pode criar outro mapeamento, mas nunca promove a partir do próprio uid autenticado,
+      // e o campo role fica imutável depois — impede escalada de privilégio.
+      allow create: if isAuthenticated() && (
+        (request.auth.uid == uid && request.resource.data.role == 'colaborador') ||
+        (isAdmin() && request.auth.uid != uid)
+      );
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // COLEÇÃO: usuarios
+    // ============================================================
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.authUid == request.auth.uid ||
+        (isAdmin() && isFromCompany(request.resource.data.companyId))
+      );
+      allow update: if isAuthenticated() && (
+        (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'companyId', 'authUid', 'email', 'password',
+          'goCoins', 'coins', 'saldo', 'xp', 'pontos', 'score', 'nivel', 'rank'
+        ])) ||
+        (isAdmin() && isFromCompany(resource.data.companyId))
+      );
+      allow delete: if isAuthenticated() && isAdmin() && isFromCompany(resource.data.companyId);
+    }
+
+    // ============================================================
+    // COLEÇÃO: empresas
+    // ============================================================
+    match /empresas/{companyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin() && isFromCompany(companyId);
+    }
+
+    // ============================================================
+    // COLEÇÃO: atividades
+    // ============================================================
+    match /atividades/{atividadeId} {
+      allow read: if isAuthenticated();
+      // Cria a própria atividade ou admins criam (ex.: delegar)
+      allow create: if isAuthenticated() && (
+        isSelf(request.resource.data.userId) || isAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (isSelf(resource.data.userId) || isAdmin());
+    }
+
+    // ============================================================
+    // COLEÇÃO: tarefas (missões delegadas pelo Admin)
+    // ============================================================
+    match /tarefas/{tarefaId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAuthenticated() && isAdmin() && isFromCompany(request.resource.data.companyId);
+      allow update: if isAuthenticated() && (
+        (isAdmin() && isFromCompany(resource.data.companyId)) ||
+        // Self-update do colaborador: só envia/reenvia para revisão.
+        // Não pode auto-aprovar (status final), nem alterar campos de auditoria/destino.
+        (isSelf(resource.data.userId) &&
+          request.resource.data.status in ['pendente', 'em_revisao'] &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'userId', 'companyId', 'senderId', 'adminId', 'aprovadoPor', 'feedbackAdmin', 'aprovadoEm'
+          ]))
+      );
+    }
+
+    // ============================================================
+    // COLEÇÃO: acessos (log de auditoria — imutável)
+    // ============================================================
+    match /acessos/{acessoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isFromCompany(request.resource.data.companyId);
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // COLEÇÃO: feedbacks
+    // ============================================================
+    match /feedbacks/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isFromCompany(request.resource.data.companyId);
+      allow update, delete: if isAuthenticated() && isAdmin() && isFromCompany(resource.data.companyId);
+    }
+
+    // ============================================================
+    // COLEÇÃO: notificacoes (sem companyId no payload — validar por userId)
+    // ============================================================
+    match /notificacoes/{notifId} {
+      allow read: if isAuthenticated();
+      // Admin cria notificações para outros (delegar/aprovar); usuário para si próprio
+      allow create: if isAuthenticated() && (isSelf(request.resource.data.userId) || isAdmin());
+      allow update: if isAuthenticated() && (isSelf(resource.data.userId) || isAdmin());
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    // ============================================================
+    // COLEÇÃO: lembretes (eventos do calendário)
+    // ============================================================
+    match /lembretes/{lembreteId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isFromCompany(request.resource.data.companyId);
+      allow update, delete: if isAuthenticated() && (
+        isSelf(resource.data.userId) ||
+        (isAdmin() && isFromCompany(resource.data.companyId))
+      );
+    }
+
+    // ============================================================
+    // COLEÇÃO: premios (catálogo de prêmios da loja)
+    // ============================================================
+    match /premios/{premioId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin() && isFromCompany(resource.data.companyId);
+    }
+
+    // ============================================================
+    // COLEÇÃO: resgates (histórico de resgates da loja)
+    // ============================================================
+    match /resgates/{resgateId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isFromCompany(request.resource.data.companyId) &&
+        isSelf(request.resource.data.userId) && request.resource.data.status == 'pendente';
+      allow update: if isAuthenticated() && isAdmin() && isFromCompany(resource.data.companyId);
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // COLEÇÃO: todo_lists (listas de tarefas do calendário)
+    // ============================================================
+    match /todo_lists/{listId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isFromCompany(request.resource.data.companyId) &&
+        isSelf(request.resource.data.userId);
+      allow update, delete: if isAuthenticated() && (
+        isSelf(resource.data.userId) ||
+        (isAdmin() && isFromCompany(resource.data.companyId))
+      );
+    }
+
+    // ============================================================
+    // COLEÇÃO: todos (itens dentro das listas do calendário)
+    // ============================================================
+    match /todos/{todoId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (
+        (request.resource.data.listId != null && isOwnerOfList(request.resource.data.listId)) ||
+        (resource.data.listId != null && isOwnerOfList(resource.data.listId))
+      );
+    }
+
+    // NOTA: Validação server-side de GoCoins/XP (evitar fraude em resgates e
+    // atividades) exige Cloud Functions + transações. O plano atual usa o tier
+    // gratuito (sem functions ativas). Ao assinar o Blaze, implementar um
+    // onCall/onCreate que debita goCoins com transação e bloqueia resgates sem saldo.
+  }
+}

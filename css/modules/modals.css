@@ -1,0 +1,291 @@
+/* ============ MODAL ============ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--color-bg-secondary); /* Segue o fundo do tema */
+  width: 100%;
+  max-width: 500px;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.close-modal:hover {
+  color: var(--color-danger);
+}
+
+/* Destaque para os Anexos do Admin */
+.admin-attachment-box {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 2px dashed var(--color-info) !important;
+  padding: 20px !important;
+  border-radius: 12px !important;
+  margin: 20px 0 !important;
+}
+
+/* Teams Style Modal */
+.teams-modal {
+  max-width: 1000px !important;
+  width: 90% !important;
+  height: 85vh !important;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-icon-main { font-size: 24px; color: var(--color-primary); }
+.modal-subtitle { font-size: 13px; opacity: 0.7; }
+
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 250px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.teams-main-column { padding: 30px; border-right: 1px solid var(--color-border); }
+.teams-sidebar { padding: 30px; background: rgba(0,0,0,0.02); }
+
+.modal-section { margin-bottom: 30px; }
+.modal-section h3 { font-size: 14px; margin-bottom: 15px; border: none; }
+
+.description-box { line-height: 1.6; font-size: 15px; }
+
+/* Grid de Anexos (Estilo Teams) */
+.attachment-grid-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.download-card-teams {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: 0.2s;
+}
+
+.download-card-teams:hover { border-color: var(--color-primary); background: rgba(16, 185, 129, 0.05); }
+
+/* --- MODAL ESTILO TEAMS --- */
+.teams-body { display: grid; grid-template-columns: 1fr 280px; height: 100%; overflow-y: auto; }
+.teams-main { padding: 30px; border-right: 1px solid var(--color-border); }
+.teams-side { padding: 30px; background: rgba(0,0,0,0.02); }
+
+/* ======================================================= */
+/* MODAL TEAMS STYLE (TAREFAS RECEBIDAS)                   */
+/* ======================================================= */
+
+/* 1. Anula as margens padrão do modal antigo */
+.modal-content.teams-modal {
+  max-width: 900px !important;
+  width: 95% !important;
+  height: 85vh !important;
+  padding: 0 !important; /* REMOVE A BORDA BRANCA GIGANTE */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: 16px !important;
+}
+
+/* 2. Cabeçalho */
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.teams-header-info { display: flex; align-items: center; gap: 15px; }
+
+.teams-header-info .icon-circle {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+
+.teams-header-info h2 { margin: 0 0 4px 0 !important; font-size: 20px !important; border: none !important; padding: 0 !important; }
+.teams-header-info .subtitle { margin: 0; font-size: 13px; color: var(--color-text-secondary); }
+
+.teams-modal-header .close-modal { align-self: center; margin: 0; padding: 0; display: block; }
+
+/* 3. Corpo (Sistema de Grid 2 Colunas) */
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-bg-secondary);
+}
+
+.teams-main-column { padding: 30px; }
+.teams-sidebar { padding: 30px; background: var(--color-bg-primary); border-left: 1px solid var(--color-border); }
+
+/* 4. Secções e Instruções */
+.teams-section { margin-bottom: 35px; }
+.teams-section h3 {
+  font-size: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px;
+}
+
+.instruction-box { background: var(--color-bg-primary); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border); }
+.instruction-box p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--color-text-primary); }
+
+/* 5. Downloads */
+.teams-attachment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.download-card-teams { background: var(--color-bg-secondary); border: 1px solid var(--color-border); padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--color-text-primary); transition: 0.2s; }
+.download-card-teams:hover { border-color: var(--color-info); background: rgba(59, 130, 246, 0.05); }
+
+/* 6. Sidebar (Direita) */
+.sidebar-block { margin-bottom: 25px; }
+.sidebar-block label { font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; }
+.sidebar-block p { font-weight: 600; font-size: 14px; margin: 0; color: var(--color-text-primary); }
+
+/* ======================================================= */
+/* CORREÇÃO DE ESCALA E LAYOUT (MODAL TEAMS)               */
+/* ======================================================= */
+
+#modalResponderTarefa.modal-overlay {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(5px) !important;
+}
+
+/* 🚀 TRAVA A JANELA NO CENTRO E IMPEDE DE VAZAR A TELA */
+.modal-content.teams-modal {
+  padding: 0 !important; /* Anula o branco extra */
+  max-width: 950px !important;
+  width: 95% !important;
+  height: 85vh !important; /* Fixa a altura máxima */
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 16px !important;
+  overflow: hidden !important; /* Corta qualquer coisa que tente sair da caixa */
+  background: var(--color-bg-secondary) !important;
+}
+
+.teams-modal-header {
+  padding: 20px 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0; /* Impede o cabeçalho de encolher */
+}
+
+.teams-header-info { display: flex; align-items: center; gap: 15px; }
+.teams-header-info .icon-circle {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.teams-header-info h2 { margin: 0 0 4px 0 !important; font-size: 20px !important; border: none !important; padding: 0 !important; }
+
+/* 🚀 O SEGREDO DO SCROLL: Só o corpo da janela rola */
+.teams-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  overflow-y: auto; /* Scroll apenas interno */
+  flex-grow: 1; /* Ocupa o resto do espaço */
+  height: 100%;
+}
+
+.teams-main-column {
+  padding: 30px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 25px; /* Espaço igual entre as caixas */
+}
+
+.teams-sidebar { 
+  padding: 30px; 
+  background: var(--color-bg-primary); 
+  border-left: 1px solid var(--color-border); 
+}
+
+.teams-section {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 0 !important;
+}
+body.dark-mode .teams-section { background: rgba(0, 0, 0, 0.15); }
+
+.teams-section h3 {
+  font-size: 15px !important; margin: 0 0 15px 0 !important;
+  border-bottom: 1px dashed var(--color-border) !important;
+  padding-bottom: 12px !important; color: var(--color-text-primary) !important;
+}
+
+.instruction-box {
+  background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+  padding: 16px; border-radius: 8px;
+}
+.instruction-box p { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--color-text-primary); }
+
+/* VISUAL DO MODAL DE ANEXOS */
+#attachmentModal .modal-content {
+  background-color: #ffffff;
+  border: none;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+/* Remove a linha divisória do cabeçalho do modal */
+#attachmentModal .modal-header {
+  border-bottom: none;
+  padding-bottom: 0;
+}

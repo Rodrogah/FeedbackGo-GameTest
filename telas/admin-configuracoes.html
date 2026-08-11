@@ -176,27 +176,27 @@
               <div id="boxGami">
                 <div id="gamiTabRegras" class="gami-internal-section" style="display: block;">
                   <div class="form-grid">
-                    <div class="form-group"><label>XP Base</label><input type="number" id="gamiXpBase"></div>
-                    <div class="form-group"><label>XP p/ Nível</label><input type="number" id="gamiXpNivel"></div>
-                    <div class="form-group"><label>GoCoins p/ Nível</label><input type="number" id="gamiCoinsNivel"></div>
+                    <div class="form-group"><label>XP Base <i class="fa-solid fa-circle-question gami-tip" title="Pontos ganhos por tarefa concluída. É multiplicado pelo peso da dificuldade escolhida."></i></label><input type="number" id="gamiXpBase"></div>
+                    <div class="form-group"><label>XP p/ Nível <i class="fa-solid fa-circle-question gami-tip" title="Total de XP que o colaborador precisa acumular para subir um nível."></i></label><input type="number" id="gamiXpNivel"></div>
+                    <div class="form-group"><label>GoCoins p/ Nível <i class="fa-solid fa-circle-question gami-tip" title="Moedas ganhas automaticamente a cada nível alcançado. Usadas na Loja de Gift Cards."></i></label><input type="number" id="gamiCoinsNivel"></div>
                   </div>
                 </div>
                 
                 <div id="gamiTabDificuldade" class="gami-internal-section" style="display: none;">
                   <div class="form-grid">
-                    <div class="form-group"><label>Peso: Fácil</label><input type="number" step="0.1" id="gamiPesoFacil"></div>
-                    <div class="form-group"><label>Peso: Média</label><input type="number" step="0.1" id="gamiPesoMedia"></div>
-                    <div class="form-group"><label>Peso: Difícil</label><input type="number" step="0.1" id="gamiPesoDificil"></div>
+                    <div class="form-group"><label>Peso: Fácil <i class="fa-solid fa-circle-question gami-tip" title="Multiplicador aplicado ao XP Base quando o colaborador marca a tarefa como fácil."></i></label><input type="number" step="0.1" id="gamiPesoFacil"></div>
+                    <div class="form-group"><label>Peso: Média <i class="fa-solid fa-circle-question gami-tip" title="Multiplicador aplicado ao XP Base quando o colaborador marca a tarefa como média."></i></label><input type="number" step="0.1" id="gamiPesoMedia"></div>
+                    <div class="form-group"><label>Peso: Difícil <i class="fa-solid fa-circle-question gami-tip" title="Multiplicador aplicado ao XP Base quando o colaborador marca a tarefa como difícil."></i></label><input type="number" step="0.1" id="gamiPesoDificil"></div>
                   </div>
                 </div>
                 
                 <div id="gamiTabRanking" class="gami-internal-section" style="display: none;">
                   <div class="form-grid">
-                    <div class="form-group"><label>🥇 1º Lugar</label><input type="number" id="gamiPremioTop1"></div>
-                    <div class="form-group"><label>🥈 2º Lugar</label><input type="number" id="gamiPremioTop2"></div>
-                    <div class="form-group"><label>🥉 3º Lugar</label><input type="number" id="gamiPremioTop3"></div>
-                    <div class="form-group"><label>🏅 4º Lugar</label><input type="number" id="gamiPremioTop4"></div>
-                    <div class="form-group"><label>🏅 5º Lugar</label><input type="number" id="gamiPremioTop5"></div>
+                    <div class="form-group"><label>🥇 1º Lugar <i class="fa-solid fa-circle-question gami-tip" title="GoCoins pagos ao vencedor do ranking mensal de XP."></i></label><input type="number" id="gamiPremioTop1"></div>
+                    <div class="form-group"><label>🥈 2º Lugar <i class="fa-solid fa-circle-question gami-tip" title="GoCoins pagos ao 2º colocado do ranking mensal de XP."></i></label><input type="number" id="gamiPremioTop2"></div>
+                    <div class="form-group"><label>🥉 3º Lugar <i class="fa-solid fa-circle-question gami-tip" title="GoCoins pagos ao 3º colocado do ranking mensal de XP."></i></label><input type="number" id="gamiPremioTop3"></div>
+                    <div class="form-group"><label>🏅 4º Lugar <i class="fa-solid fa-circle-question gami-tip" title="GoCoins pagos ao 4º colocado do ranking mensal de XP."></i></label><input type="number" id="gamiPremioTop4"></div>
+                    <div class="form-group"><label>🏅 5º Lugar <i class="fa-solid fa-circle-question gami-tip" title="GoCoins pagos ao 5º colocado do ranking mensal de XP."></i></label><input type="number" id="gamiPremioTop5"></div>
                   </div>
                 </div>
       
@@ -215,8 +215,58 @@
                   </div>
                 </div>
                 
+                <!-- Como funciona -->
+                <div style="margin-top: 25px; padding: 18px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.06)); border: 1px solid var(--color-border); border-radius: 12px;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+                    <i class="fa-solid fa-route" style="color: var(--color-primary);"></i>
+                    <strong style="font-size: 13px;">Como funciona a gamificação</strong>
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                    <span style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 700;"><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Conclui a tarefa</span>
+                    <i class="fa-solid fa-arrow-right" style="color: var(--color-text-secondary); font-size: 12px;"></i>
+                    <span style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 700;"><i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> Ganha XP pela dificuldade</span>
+                    <i class="fa-solid fa-arrow-right" style="color: var(--color-text-secondary); font-size: 12px;"></i>
+                    <span style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 700;"><i class="fa-solid fa-ranking-star" style="color: var(--color-primary);"></i> Sobe de nível</span>
+                    <i class="fa-solid fa-arrow-right" style="color: var(--color-text-secondary); font-size: 12px;"></i>
+                    <span style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 700;"><i class="fa-solid fa-gift" style="color: #ec4899;"></i> Troca GoCoins na Loja</span>
+                  </div>
+                </div>
+
+                <!-- Progressão de Níveis -->
+                <div style="margin-top: 16px; padding: 18px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 12px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-chart-simple" style="color: var(--color-primary);"></i>
+                      <strong style="font-size: 13px;">Progressão de Níveis</strong>
+                    </div>
+                    <button type="button" class="btn btn-small" onclick="window.renderGamiProgressionTable()" style="background: transparent; border: 1px solid var(--color-border); color: var(--color-text-primary);"><i class="fa-solid fa-rotate"></i> Atualizar progressão</button>
+                  </div>
+
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+                    <span style="flex: 1; min-width: 150px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary);">
+                      <i class="fa-solid fa-bolt" style="color: #f59e0b;"></i> Tarefa fácil vale
+                      <strong style="color: var(--color-text-primary); font-size: 14px;"><span id="gamiChipFacil">–</span> XP</strong>
+                    </span>
+                    <span style="flex: 1; min-width: 150px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary);">
+                      <i class="fa-solid fa-layer-group" style="color: var(--color-primary);"></i> Um nível equivale a
+                      <strong style="color: var(--color-text-primary); font-size: 14px;">≈ <span id="gamiChipTarefas">–</span> tarefas médias</strong>
+                    </span>
+                    <span style="flex: 1; min-width: 150px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary);">
+                      <i class="fa-solid fa-gift" style="color: #ec4899;"></i> Gift Card R$ 50 custa
+                      <strong style="color: var(--color-text-primary); font-size: 14px;"><span id="gamiChipGift50">–</span> GoCoins</strong>
+                    </span>
+                  </div>
+
+                  <div id="gamiProgressionTable" style="overflow-x: auto;"></div>
+                </div>
+
+                <p id="gamiInvalidMsg" style="display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 8px; color: #ef4444; font-size: 12px; font-weight: 700;"></p>
+                
                 <button type="button" class="btn btn-primary" onclick="salvarRegrasGamificacao(this)" style="margin-top: 25px; width: 100%;">
                   <i class="fa-solid fa-floppy-disk"></i> Guardar Configurações
+                </button>
+                <button type="button" class="btn" onclick="restaurarPadraoGamificacao()" style="margin-top: 10px; width: 100%; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-secondary);">
+                  <i class="fa-solid fa-rotate-left"></i> Restaurar Valores Padrão
                 </button>
               </div>
             </div>

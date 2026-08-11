@@ -1,41 +1,108 @@
 <div id="adminReports">
-    <div class="page-header">
-        <h1><i class="fa-solid fa-chart-area"></i> Relatórios</h1>
+
+  <!-- Cabeçalho da Página -->
+  <div class="page-header">
+    <h1><i class="fa-solid fa-chart-area"></i> Relatórios</h1>
+  </div>
+
+  <!-- Card de Filtros -->
+  <div class="card" style="margin-bottom: 24px;">
+
+    <!-- Título + Contador -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+      <h3 style="margin: 0; border: none; padding: 0;">
+        <i class="fa-solid fa-sliders"></i> Filtros
+      </h3>
+      <span id="reportResultCount" style="font-size: 13px; font-weight: 600; color: var(--color-text-secondary); display: inline-flex; align-items: center; gap: 5px;">
+        <i class="fa-solid fa-list-check"></i>
+        <span id="reportResultCountValue">0</span> registros encontrados
+      </span>
     </div>
-    <div class="card">
-        <h3><i class="fa-solid fa-calendar-days"></i> Gerar Relatório</h3>
-        <div class="form-grid" style="margin-bottom: 24px;">
-            <div class="form-group full-width">
-                <label>Buscar por Título/Descrição</label>
-                <input type="text" id="reportFilterSearch" placeholder="Digite uma palavra-chave..." onkeyup="if(event.key === 'Enter') generateReport()">
-            </div>
-    
-            <div class="form-group">
-                <label>Filtrar por Equipe</label>
-                <select id="reportFilterTeam"><option value="">Todas as Equipes</option></select>
-            </div>
-            <div class="form-group">
-                <label>Filtrar por Colaborador</label>
-                <select id="reportFilterUser"><option value="">Todos os Colaboradores</option></select>
-            </div>
-            <div class="form-group">
-                <label>Filtrar por Categoria</label>
-                <select id="reportFilterCategory"><option value="">Todas as Categorias</option></select>
-            </div>
-            <div class="form-group"></div> <div class="form-group">
-                <label>Data Inicial</label>
-                <input type="date" id="reportStartDate">
-            </div>
-            <div class="form-group">
-                <label>Data Final</label>
-                <input type="date" id="reportEndDate">
-            </div>
-        </div>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <button onclick="generateReport()" class="btn btn-small"><i class="fa-solid fa-magnifying-glass"></i> Ver no Ecrã</button>
-            <button onclick="downloadReportExcel()" class="btn btn-small btn-success"><i class="fa-solid fa-file-excel"></i> Exportar para Excel</button>
-            <button onclick="sendFilteredReportEmail(event)" class="btn btn-small btn-info"><i class="fa-solid fa-envelope-open-text"></i> Enviar Relatório Selecionado</button>
-        </div>
-        <div id="periodReport" style="margin-top: 30px;"></div>
+
+    <!-- Busca por Texto -->
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+        <i class="fa-solid fa-magnifying-glass" style="margin-right: 4px;"></i> Buscar por Título / Descrição
+      </label>
+      <input
+        type="text"
+        id="reportFilterSearch"
+        placeholder="Digite uma palavra-chave..."
+        oninput="window.reportAutoRefresh()"
+        style="width: 100%; box-sizing: border-box;"
+      >
     </div>
+
+    <!-- Linha: Equipe + Colaborador + Categoria -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+      <div>
+        <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+          <i class="fa-solid fa-users" style="margin-right: 4px;"></i> Equipe
+        </label>
+        <select id="reportFilterTeam" onchange="window.reportTriggerRefresh()" style="width: 100%; box-sizing: border-box;">
+          <option value="">Todas as Equipes</option>
+        </select>
+      </div>
+      <div>
+        <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+          <i class="fa-solid fa-user" style="margin-right: 4px;"></i> Colaborador
+        </label>
+        <select id="reportFilterUser" onchange="window.reportTriggerRefresh()" style="width: 100%; box-sizing: border-box;">
+          <option value="">Todos os Colaboradores</option>
+        </select>
+      </div>
+      <div>
+        <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+          <i class="fa-solid fa-tag" style="margin-right: 4px;"></i> Categoria
+        </label>
+        <select id="reportFilterCategory" onchange="window.reportTriggerRefresh()" style="width: 100%; box-sizing: border-box;">
+          <option value="">Todas as Categorias</option>
+        </select>
+      </div>
     </div>
+
+    <!-- Linha: Datas -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+      <div>
+        <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+          <i class="fa-solid fa-calendar-day" style="margin-right: 4px;"></i> Data Inicial
+        </label>
+        <input type="date" id="reportStartDate" onchange="window.reportTriggerRefresh()" style="width: 100%; box-sizing: border-box;">
+      </div>
+      <div>
+        <label style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; color: var(--color-text-secondary);">
+          <i class="fa-solid fa-calendar-check" style="margin-right: 4px;"></i> Data Final
+        </label>
+        <input type="date" id="reportEndDate" onchange="window.reportTriggerRefresh()" style="width: 100%; box-sizing: border-box;">
+      </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div style="padding-top: 16px; border-top: 1px solid var(--color-border); display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+
+      <!-- Exportar Excel -->
+      <button
+        onclick="downloadReportExcel()"
+        class="btn btn-small btn-success"
+        style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-size: 14px; font-weight: 700;"
+      >
+        <i class="fa-solid fa-file-excel"></i> Exportar Excel
+      </button>
+
+      <!-- Enviar por e-mail -->
+      <button
+        onclick="sendFilteredReportEmail(event)"
+        class="btn btn-small btn-info"
+        style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-size: 14px; font-weight: 700;"
+      >
+        <i class="fa-solid fa-envelope-open-text"></i> Enviar por E-mail
+      </button>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- Resultado do Relatório (sempre visível) -->
+  <div id="periodReport"></div>
+
+</div>

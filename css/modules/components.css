@@ -1,0 +1,263 @@
+/* ======================================================= */
+/* PULL TO REFRESH - VERSÃO BOLINHA FLUTUANTE              */
+/* ======================================================= */
+.ptr-element {
+  position: fixed;
+  top: 50px; /* Ajuste para ficar abaixo do seu header */
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  transform: translateY(-120px); /* Garante que começa fora do ecrã */
+  transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1);
+  pointer-events: none; /* Deixa clicar no que está atrás dela */
+}
+
+.ptr-bubble {
+  width: 42px;
+  height: 42px;
+  background: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  color: #10b981;
+}
+
+/* ============ ANIMAÇÕES DE NAVEGAÇÃO ============ */
+.fade-entrar {
+  animation: transicaoTela 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes transicaoTela {
+  0% {
+      opacity: 0;
+      /* Usar margin em vez de transform impede que o modal fique preso! */
+      margin-top: 15px; 
+  }
+  100% {
+      opacity: 1;
+      margin-top: 0;
+  }
+}
+
+/* ======================================================= */
+/* CALENDÁRIOS PREMIUM (FLATPICKR) - LISTA E POSIÇÃO       */
+/* ======================================================= */
+
+/* 1. Esconde resquícios do calendário antigo do navegador */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button {
+    display: none;
+    opacity: 0;
+}
+
+/* 2. Base do Calendário */
+.flatpickr-calendar {
+    font-family: inherit !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08), 0 20px 40px rgba(15, 23, 42, 0.12) !important;
+    border: 1px solid rgba(16, 185, 129, 0.15) !important;
+    padding: 12px 14px 18px 14px !important;
+    background: var(--color-bg-primary) !important;
+    width: 310px !important;
+}
+
+/* 🚀 Joga o calendário um pouco mais para cima ao abrir */
+.flatpickr-calendar.open {
+    margin-top: -8px !important; 
+}
+
+/* Esconde setinhas padrão de balão */
+.flatpickr-calendar.arrowTop:before,
+.flatpickr-calendar.arrowTop:after,
+.flatpickr-calendar.arrowBottom:before,
+.flatpickr-calendar.arrowBottom:after {
+    display: none !important;
+}
+
+/* 3. BLINDAGEM DO CABEÇALHO (Mês e Ano em formato interativo) */
+.flatpickr-months {
+    position: relative !important;
+    padding: 5px 0 15px 0 !important;
+    align-items: center !important;
+}
+
+.flatpickr-current-month {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+}
+
+/* O Mês (Transformado visualmente numa lista/dropdown) */
+.flatpickr-calendar .flatpickr-monthDropdown-months {
+    background: rgba(16, 185, 129, 0.06) !important;
+    border: 1px solid rgba(16, 185, 129, 0.1) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    outline: none !important;
+    color: var(--color-text-primary) !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
+    height: 36px !important;
+    box-sizing: border-box !important;
+    vertical-align: middle !important;
+    transition: all 0.2s ease !important;
+}
+
+.flatpickr-calendar .flatpickr-monthDropdown-months:hover {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+/* O Ano */
+.flatpickr-calendar input.cur-year {
+    background: rgba(16, 185, 129, 0.06) !important;
+    border: 1px solid rgba(16, 185, 129, 0.1) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    padding: 6px 8px !important;
+    margin: 0 !important;
+    outline: none !important;
+    cursor: pointer !important;
+    color: var(--color-text-primary) !important;
+    width: 60px !important;
+    height: 36px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.flatpickr-calendar input.cur-year:hover {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Revela as setinhas de subir/descer do Ano ao lado do número */
+.flatpickr-calendar .numInputWrapper span {
+    display: none !important; /* Esconde botões feios padrão */
+}
+
+/* Setas de passar o mês */
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(16, 185, 129, 0.05) !important;
+    transition: all 0.2s ease !important;
+    color: var(--color-primary) !important;
+    fill: var(--color-primary) !important;
+    border: 1px solid rgba(16, 185, 129, 0.1) !important;
+    z-index: 10 !important;
+}
+
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    transform: translateY(-50%) scale(1.08) !important;
+}
+
+.flatpickr-months .flatpickr-prev-month {
+    left: 0 !important;
+}
+
+.flatpickr-months .flatpickr-next-month {
+    right: 0 !important;
+}
+
+/* Dias da Semana */
+.flatpickr-weekdays {
+    height: 32px !important;
+    margin-bottom: 6px !important;
+}
+
+span.flatpickr-weekday {
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    color: var(--color-text-secondary) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    opacity: 0.8 !important;
+}
+
+/* 4. DESIGN DOS DIAS */
+.dayContainer {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    justify-content: space-around !important;
+    row-gap: 4px !important;
+}
+
+.flatpickr-day {
+    border-radius: 50% !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    color: var(--color-text-primary) !important;
+    height: 36px !important;
+    line-height: 34px !important;
+    margin: 0 !important;
+    border: 1px solid transparent !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    background: transparent !important;
+}
+
+/* Hoje */
+.flatpickr-day.today {
+    border-color: var(--color-primary) !important;
+    background: rgba(16, 185, 129, 0.05) !important;
+    color: var(--color-primary) !important;
+    font-weight: 800 !important;
+}
+.flatpickr-day.today:hover {
+    background: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Selecionado */
+.flatpickr-day.selected, 
+.flatpickr-day.startRange, 
+.flatpickr-day.endRange {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+    transform: scale(1.05) !important;
+    font-weight: 800 !important;
+}
+
+/* Hover em dias normais */
+.flatpickr-day:hover:not(.selected) {
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: var(--color-primary) !important;
+    transform: scale(1.05) !important;
+}
+
+/* Fora do Mês */
+.flatpickr-day.prevMonthDay, 
+.flatpickr-day.nextMonthDay,
+.flatpickr-day.flatpickr-disabled {
+    color: var(--color-text-secondary) !important;
+    opacity: 0.35 !important;
+}

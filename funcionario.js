@@ -1,4 +1,4 @@
-// ============ MOTOR DE NAVEGAÇÃO DO FUNCIONÁRIO ============
+﻿// ============ MOTOR DE NAVEGAÇÃO DO FUNCIONÁRIO ============
 async function showEmployeeSection(sec) {
     const palco = document.getElementById('funcConteudoDinamico'); 
     if (!palco) return console.error('Erro fatal: funcConteudoDinamico não existe!');
@@ -136,7 +136,7 @@ async function showEmployeeSection(sec) {
     const sideAvatar = document.getElementById('employeeAvatar');
     if (sideAvatar) {
         if (currentUser.avatarUrl && currentUser.avatarUrl.includes('dicebear')) {
-            sideAvatar.innerHTML = `<img src="${currentUser.avatarUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+            sideAvatar.innerHTML = `<img src="${safeUrl(currentUser.avatarUrl)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
         } else {
             sideAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
         }
@@ -644,43 +644,77 @@ async function showEmployeeSection(sec) {
           return new Date(b.createdAt) - new Date(a.createdAt);
       });
   
-      let html = `<div style="display: grid; gap: 15px;">`;
+      let html = `<div style="display: grid; gap: 16px;">`;
   
       lista.forEach(t => {
           const dataFormatada = new Date(t.createdAt).toLocaleDateString('pt-BR');
           const admin = users.find(u => u.id === t.senderId);
           const nomeAdmin = admin ? admin.name : 'Administrador';
   
-          const pendente = t.status === 'pendente';
+const pendente = t.status === 'pendente';
           const emRevisao = t.status === 'em_revisao';
-          
-          let corBorda = 'border-left: 4px solid var(--color-success);'; 
-          let badge = `<span class="badge" style="background:#dcfce7; color:#166534;">Concluída & Aprovada</span>`;
-          
+          const devolvida = pendente && !!t.feedbackAdmin;
+
+          let statusClass = 'concluida';
+          let badge = `<span class="status-badge status-badge--concluida"><i class="fa-solid fa-circle-check"></i> Concluída & Aprovada</span>`;
+
           if (pendente) {
-              corBorda = t.feedbackAdmin ? 'border-left: 4px solid var(--color-danger);' : 'border-left: 4px solid var(--color-warning);';
-              badge = t.feedbackAdmin 
-                  ? `<span class="badge" style="background:#fee2e2; color:#991b1b;">Devolvida c/ Erro</span>` 
-                  : `<span class="badge" style="background:#fef9c3; color:#854d0e;">Pendente</span>`;
+              statusClass = devolvida ? 'devolvida' : 'pendente';
+              badge = devolvida
+                  ? `<span class="status-badge status-badge--devolvida"><i class="fa-solid fa-triangle-exclamation"></i> Devolvida c/ Erro</span>`
+                  : `<span class="status-badge status-badge--pendente"><i class="fa-solid fa-hourglass-half"></i> Pendente</span>`;
           } else if (emRevisao) {
-              corBorda = 'border-left: 4px solid var(--color-info);';
-              badge = `<span class="badge" style="background:#dbeafe; color:#1e40af;">Em Revisão</span>`;
+              statusClass = 'revisao';
+              badge = `<span class="status-badge status-badge--revisao"><i class="fa-solid fa-magnifying-glass"></i> Em Revisão</span>`;
           }
-  
+
+          const descricaoResumida = t.description
+              ? (t.description.length > 120 ? t.description.substring(0, 120) + '...' : t.description)
+              : '';
+
+          const volBadge = t.quantidade
+              ? `<span class="status-badge status-badge--vol"><i class="fa-solid fa-chart-simple"></i> Vol: <strong>${esc(String(t.quantidade))}</strong></span>`
+              : '';
+
+          const feedbackBlock = t.feedbackAdmin ? `
+                      <div class="task-card__feedback">
+                          <i class="fa-solid fa-triangle-exclamation"></i>
+                          <div>
+                              <strong>Ajuste Necessário:</strong>
+                              <div class="task-card__feedback-text">${esc(t.feedbackAdmin)}</div>
+                          </div>
+                      </div>` : '';
+
+          let actionButton;
+          if (pendente) {
+              actionButton = `<button class="btn btn-primary btn-small btn-task-action btn-task-action--responder" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-reply"></i> ${t.feedbackAdmin ? 'Ajustar e Reenviar' : 'Responder'}</button>`;
+          } else if (emRevisao) {
+              actionButton = `<button class="btn btn-info btn-small btn-task-action btn-task-action--editar" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-pen"></i> Editar Entrega</button>`;
+          } else {
+              actionButton = `<button class="btn btn-secondary btn-small btn-task-action btn-task-action--aprovada" disabled><i class="fa-solid fa-circle-check"></i> Aprovada</button>`;
+          }
+
           html += `
-          <div class="card" style="padding: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; ${corBorda}">
-              <div style="flex: 1;">
-                  <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 5px;">De: ${nomeAdmin} • ${dataFormatada}</div>
-                  <h4 style="margin: 0 0 5px 0;">${t.title}</h4>
-                  ${badge}
-              </div>
-              <div>
-                  ${pendente
-                      ? `<button class="btn btn-primary btn-small" onclick="abrirModalTarefa('${t.id}')"><i class="fa-solid fa-reply"></i> ${t.feedbackAdmin ? 'Ver Erro e Reenviar' : 'Abrir & Responder'}</button>`
-                      : emRevisao 
-                          ? `<button class="btn btn-info btn-small" onclick="abrirModalTarefa('${t.id}')" style="background: var(--color-info); color: white; border: none;"><i class="fa-solid fa-pen"></i> Editar Entrega</button>`
-                          : `<button class="btn btn-secondary btn-small" disabled><i class="fa-solid fa-check-double"></i> Aprovada</button>`
-                  }
+          <div class="card task-card task-card--${statusClass}">
+              <div class="task-card__ribbon"></div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
+                  <div class="task-card__body">
+                      <div class="task-card__head">
+                          <span class="task-card__head-item"><i class="fa-solid fa-user-tie"></i> <strong>De: ${esc(nomeAdmin)}</strong></span>
+                          <span class="task-card__head-sep">•</span>
+                          <span class="task-card__head-item"><i class="fa-solid fa-calendar-day"></i> Envio: ${dataFormatada}</span>
+                      </div>
+                      <h4 class="task-card__title">${esc(t.title)}</h4>
+                      ${descricaoResumida ? `<p class="task-card__desc">${esc(descricaoResumida)}</p>` : ''}
+
+                      <div class="task-card__chips">
+                          ${badge}
+                          ${volBadge}
+                      </div>
+
+                      ${feedbackBlock}
+                  </div>
+                  <div class="task-card__action">${actionButton}</div>
               </div>
           </div>`;
       });
@@ -715,7 +749,7 @@ async function showEmployeeSection(sec) {
             if (t.feedbackAttachments && t.feedbackAttachments.length > 0 && boxAnexosFeedback) {
                 let anexosHtml = '';
                 t.feedbackAttachments.forEach(an => {
-                    anexosHtml += `<a href="${an.url}" download="${an.name}" class="badge" style="background: #fca5a5; color: #7f1d1d; text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid #f87171;"><i class="fa-solid fa-download"></i> ${an.name}</a>`;
+                    anexosHtml += `<a href="${escAttr(an.url)}" download="${escAttr(an.name)}" class="badge" style="background: #fca5a5; color: #7f1d1d; text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid #f87171;"><i class="fa-solid fa-download"></i> ${esc(an.name)}</a>`;
                 });
                 boxAnexosFeedback.innerHTML = anexosHtml;
             } else if (boxAnexosFeedback) {
@@ -730,7 +764,7 @@ async function showEmployeeSection(sec) {
       if (t.attachments && t.attachments.length > 0) {
           let anexosHtml = '<strong style="font-size:14px; display:block; margin-bottom: 5px;">Arquivos enviados pelo Administrador:</strong><div style="display: flex; gap: 10px; flex-wrap: wrap;">';
           t.attachments.forEach(an => {
-              anexosHtml += `<a href="${an.url}" download="${an.name}" class="badge" style="background: var(--color-bg-secondary); color: var(--color-primary); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border);"><i class="fa-solid fa-download"></i> ${an.name}</a>`;
+              anexosHtml += `<a href="${escAttr(an.url)}" download="${escAttr(an.name)}" class="badge" style="background: var(--color-bg-secondary); color: var(--color-primary); text-decoration: none; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1px solid var(--color-border);"><i class="fa-solid fa-download"></i> ${esc(an.name)}</a>`;
           });
           anexosHtml += '</div>';
           boxAnexos.innerHTML = anexosHtml;
@@ -751,17 +785,27 @@ async function showEmployeeSection(sec) {
   window.setupFuncSettingsForms = function() {
   const profForm = document.getElementById('empProfileForm');
   if (profForm) {
-      profForm.addEventListener('submit', function (e) {
+profForm.addEventListener('submit', async function (e) {
           e.preventDefault();
           const newName = document.getElementById('empProfileName').value.trim();
           const newPass = document.getElementById('empProfilePassword').value;
           const btn = profForm.querySelector('button');
           const originalText = btn ? btn.innerHTML : '';
           if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
-  
+
+          if (newPass) {
+              // A senha é alterada no Firebase Auth (nunca gravada no Firestore)
+              try {
+                  await firebase.auth().currentUser.updatePassword(newPass);
+              } catch (err) {
+                  showNotice('empProfileAlert', 'Erro ao alterar senha: ' + (err.message || 'tente novamente'), 'error');
+                  if (btn) btn.innerHTML = originalText || '<i class="fa-solid fa-floppy-disk"></i> Atualizar';
+                  return;
+              }
+          }
+
           let updates = {};
           if (newName) updates.name = newName;
-          if (newPass) updates.password = newPass;
   
           db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
               if (newName) {
@@ -806,42 +850,66 @@ async function showEmployeeSection(sec) {
   };
   
   function renderizarBarraGamificacao() {
-  let xp = currentUser.xp || 0;
-  let coins = currentUser.goCoins || 0;
-  let level = currentUser.level || 1;
-  
-  const c = companies.find(x => x.id === currentUser.companyId);
-  let xpNecessarioPorNivel = 500;
-  if (c && c.gamificacao && c.gamificacao.xpNivel) {
-      xpNecessarioPorNivel = c.gamificacao.xpNivel;
-  }
-  
-  let titulos = { 1: 'Iniciante', 2: 'Focado', 3: 'Produtivo', 4: 'Especialista', 5: 'Mestre das Entregas' };
-  let tituloAtual = titulos[level] || 'Lenda da Empresa 👑';
-  
-  let xpAtualNoNivel = xp % xpNecessarioPorNivel; 
-  let porcentagem = (xpAtualNoNivel / xpNecessarioPorNivel) * 100;
-  
-  const levelDisplay = document.getElementById('userLevelDisplay');
-  if (levelDisplay) {
-      levelDisplay.innerText = level;
-      document.getElementById('userTitleDisplay').innerText = tituloAtual;
-      document.getElementById('currentXpDisplay').innerText = xpAtualNoNivel;
-      
-      const nextLevelDisplay = document.getElementById('nextLevelXpDisplay');
-      if(nextLevelDisplay) nextLevelDisplay.innerText = xpNecessarioPorNivel;
-  
-      document.getElementById('xpProgressBar').style.width = Math.min(porcentagem, 100) + '%';
-      
-      const coinDisplay = document.getElementById('goCoinsDisplay');
-      if (coinDisplay && coinDisplay.innerText !== coins.toString()) {
-          coinDisplay.innerText = coins;
-          coinDisplay.parentElement.style.transform = 'scale(1.2)';
-          setTimeout(() => { coinDisplay.parentElement.style.transform = 'scale(1)'; }, 300);
-      } else if (coinDisplay) {
-          coinDisplay.innerText = coins;
-      }
-  }
+    let xp = currentUser.xp || 0;
+    let coins = currentUser.goCoins || 0;
+    let level = currentUser.level || 1;
+    
+    const c = companies.find(x => String(x.id) === String(currentUser.companyId));
+    let xpNecessarioPorNivel = 500;
+    if (c && c.gamificacao && c.gamificacao.xpNivel) {
+        xpNecessarioPorNivel = c.gamificacao.xpNivel;
+    }
+    
+    const patente = (typeof getPatente === 'function') ? getPatente(level) : null;
+    const proximaPatente = (typeof getProximaPatente === 'function') ? getProximaPatente(level) : null;
+    let tituloAtual = patente ? patente.nome : 'Recruta';
+    
+    let xpAtualNoNivel = xp % xpNecessarioPorNivel; 
+    let porcentagem = (xpAtualNoNivel / xpNecessarioPorNivel) * 100;
+    
+    const levelDisplay = document.getElementById('userLevelDisplay');
+    if (levelDisplay) {
+        levelDisplay.innerText = level;
+        const userTitle = document.getElementById('userTitleDisplay');
+        if (userTitle) userTitle.innerText = tituloAtual;
+
+        const levelBox = document.querySelector('.level-box');
+        if (levelBox && patente) {
+            levelBox.style.background = patente.gradient;
+        }
+
+        const rankingBadge = document.getElementById('userRankingBadge');
+        if (rankingBadge && patente) {
+            const imgPath = encodeURI(patente.imagem);
+            rankingBadge.innerHTML = `<img src="${imgPath}" alt="${patente.nome}" title="${patente.nome}" style="width: 38px; height: 38px; object-fit: contain; cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.onerror=null; this.parentNode.innerHTML='<i class=\\'${patente.icone || 'fa-solid fa-medal'}\\' style=\\'color:#fbbf24; font-size:24px;\\'></i>';" onclick="window.mostrarListaPatentes()">`;
+            rankingBadge.style.background = patente.gradient;
+            rankingBadge.style.cursor = 'pointer';
+            rankingBadge.onclick = () => window.mostrarListaPatentes();
+        }
+        const currentXp = document.getElementById('currentXpDisplay');
+        if (currentXp) currentXp.innerText = xpAtualNoNivel;
+        
+        const nextLevelDisplay = document.getElementById('nextLevelXpDisplay');
+        if (nextLevelDisplay) nextLevelDisplay.innerText = xpNecessarioPorNivel;
+    
+        const progressBar = document.getElementById('xpProgressBar');
+        if (progressBar) {
+            progressBar.style.width = Math.min(porcentagem, 100) + '%';
+            if (patente) {
+                progressBar.style.background = patente.gradient;
+                progressBar.style.boxShadow = `0 0 15px ${patente.cor}60`;
+            }
+        }
+        
+        const coinDisplay = document.getElementById('goCoinsDisplay');
+        if (coinDisplay && coinDisplay.innerText !== coins.toString()) {
+            coinDisplay.innerText = coins;
+            coinDisplay.parentElement.style.transform = 'scale(1.2)';
+            setTimeout(() => { coinDisplay.parentElement.style.transform = 'scale(1)'; }, 300);
+        } else if (coinDisplay) {
+            coinDisplay.innerText = coins;
+        }
+    }
   }
   
   
@@ -867,7 +935,7 @@ window.setupFuncStore = function() {
     let html = '';
     
     // 🔥 NOVO: Lê as configurações do Admin (Câmbio e Marcas Ativas)
-    const configLoja = c.giftCardConfig || { rate: 10, active: ['uber', 'netflix', 'xbox', 'spotify', 'playstation', 'steam'] };
+    const configLoja = c.giftCardConfig || { rate: 10, active: [] };
     const taxaCambio = configLoja.rate || 10;
     
     if (window.apiGiftCardsCatalog) {
@@ -897,8 +965,8 @@ window.setupFuncStore = function() {
                         }).join('')}
                     </select>
 
-                    <button onclick="solicitarResgateGiftCard('${card.id}')" class="btn" style="width: 100%; background: #10b981; color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; transition: 0.2s;">
-                        <i class="fa-solid fa-cart-shopping"></i> Resgatar
+                    <button onclick="solicitarResgateGiftCard('${card.id}')" class="btn" style="width: 100%; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(4, 120, 87, 0.3);">
+                        <img src="Patentes/Moedas/GoCoins.svg" alt="Coins" style="width: 22px; height: 22px; object-fit: contain;"> Resgatar
                     </button>
                 </div>
             </div>`;
@@ -912,22 +980,48 @@ window.setupFuncStore = function() {
             premiosInternos.sort((a, b) => a.preco - b.preco);
 
             premiosInternos.forEach(p => {
+                const imgContent = (p.imagemBase64 || p.imagem)
+                    ? `<img src="${p.imagemBase64 || p.imagem}" alt="${p.nome}" style="width: 100%; height: 100%; object-fit: cover;">`
+                    : `<i class="fa-solid fa-star" style="font-size: 40px; color: #fbbf24;"></i>`;
+
+                const temValoresArray = Array.isArray(p.valores) && p.valores.length > 0;
+                let acaoPrecoHtml = '';
+
+                if (temValoresArray) {
+                    const optionsHtml = p.valores.map(v => {
+                        const custoCoins = Math.round(v * taxaCambio);
+                        return `<option value="${v}" data-coins="${custoCoins}">R$ ${v} (${custoCoins} GoCoins)</option>`;
+                    }).join('');
+
+                    acaoPrecoHtml = `
+                        <select id="select-premio-valor-${p.id}" style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid var(--color-border); font-size: 13px; background: var(--color-bg-secondary); color: var(--color-text-primary); cursor: pointer;">
+                            <option value="" disabled selected>Escolha o valor...</option>
+                            ${optionsHtml}
+                        </select>
+                        <button class="btn" style="width: 100%; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(4, 120, 87, 0.3);" onclick="solicitarResgateInternoComValor(${p.id}, '${p.nome.replace(/'/g, "\\'")}', ${p.temCodigo === true})">
+                            <img src="Patentes/Moedas/GoCoins.svg" alt="Coins" style="width: 22px; height: 22px; object-fit: contain;"> Resgatar
+                        </button>`;
+                } else {
+                    const precoFinal = p.preco || 0;
+                    acaoPrecoHtml = `
+                        <div style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #f59e0b; font-size: 14px; background: #fef3c7; color: #b45309; font-weight: bold;">
+                            <i class="fa-solid fa-coins"></i> ${precoFinal} GoCoins
+                        </div>
+                        <button class="btn" style="width: 100%; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(4, 120, 87, 0.3);" onclick="solicitarResgateInterno(${p.id}, '${p.nome.replace(/'/g, "\\'")}', ${precoFinal}, ${p.temCodigo === true})">
+                            <img src="Patentes/Moedas/GoCoins.svg" alt="Coins" style="width: 22px; height: 22px; object-fit: contain;"> Resgatar
+                        </button>`;
+                }
+
                 html += `
                 <div class="card reward-card" style="padding: 15px; text-align: center; border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; background: var(--color-bg-primary);">
                     <div>
-                        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); width: 100%; height: 130px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 15px; color: white;">
-                            <i class="fa-solid fa-star" style="font-size: 32px; margin-bottom: 10px; color: #fbbf24;"></i>
-                            <h3 style="margin: 0; font-size: 16px; padding: 0 10px;">${p.nome}</h3>
+                        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); width: 100%; height: 130px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 15px; color: white; overflow: hidden;">
+                            ${imgContent}
                         </div>
-                        <p style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 15px; height: 35px; line-height: 1.4;">${p.descricao || 'Prêmio corporativo exclusivo.'}</p>
+                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: var(--color-text-primary);">${p.nome}</h3>
                     </div>
                     <div>
-                        <div style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #f59e0b; font-size: 14px; background: #fef3c7; color: #b45309; font-weight: bold;">
-                            <i class="fa-solid fa-coins"></i> ${p.preco} GoCoins
-                        </div>
-                        <button class="btn" style="width: 100%; background: #3b82f6; color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; transition: 0.2s;" onclick="solicitarResgateInterno(${p.id}, '${p.nome}', ${p.preco})">
-                            <i class="fa-solid fa-check"></i> Resgatar
-                        </button>
+                        ${acaoPrecoHtml}
                     </div>
                 </div>`;
             });
@@ -1007,6 +1101,7 @@ window.solicitarResgateGiftCard = async function(cardId) {
                 valorBRL: valorReais,
                 skuApi: sku,
                 tipo: 'giftcard',
+                temCodigo: true,
                 status: 'pendente', 
                 createdAt: new Date().toISOString()
             };
@@ -1041,11 +1136,18 @@ window.solicitarResgateGiftCard = async function(cardId) {
 };
 
 // Resgate de Prêmio Interno (Não gasta Orçamento da Empresa)
-window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins) {
+window.solicitarResgateInternoComValor = async function (premioId, nomePremio, temCodigo = true) {
+    const select = document.getElementById(`select-premio-valor-${premioId}`);
+    if (!select || !select.value) return showToast('Por favor, escolha um valor antes de resgatar.', 'warning');
+    const opt = select.options[select.selectedIndex];
+    const valorBRL = parseFloat(opt.value);
+    const precoCoins = parseInt(opt.getAttribute('data-coins'));
+    solicitarResgateInterno(premioId, `${nomePremio} R$ ${valorBRL}`, precoCoins, temCodigo);
+};
+
+window.solicitarResgateInterno = async function (premioId, nomePremio, precoCoins, temCodigo = true) {
     const userCoins = currentUser.goCoins || 0;
-    if (userCoins < precoCoins) {
-        return showToast(`Saldo insuficiente!`, 'error');
-    }
+    if (userCoins < precoCoins) return showToast('Saldo insuficiente!', 'error');
 
     const btnOriginal = document.activeElement;
     const btnOriginalHTML = btnOriginal.innerHTML;
@@ -1079,10 +1181,12 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
                 companyId: currentUser.companyId,
                 userId: currentUser.id,
                 userName: currentUser.name,
+                premioId: premioId,
                 premioNome: nomePremio,
                 preco: precoCoins, 
                 valorBRL: 0, 
                 tipo: 'interno',
+                temCodigo: temCodigo !== false,
                 status: 'pendente', 
                 createdAt: new Date().toISOString()
             };
@@ -1115,66 +1219,136 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
         }
     }, '⭐ Confirmar Resgate', '<i class="fa-solid fa-check"></i> Resgatar', 'btn-primary');
 };
+
+window.solicitarResgateInternoComValor = async function(premioId, nomePremio) {
+    const select = document.getElementById(`select-premio-valor-${premioId}`);
+    if (!select || !select.value) {
+        return showToast('Por favor, escolha um valor antes de resgatar.', 'warning');
+    }
+    const opt = select.options[select.selectedIndex];
+    const valorBRL = parseFloat(opt.value);
+    const precoCoins = parseInt(opt.getAttribute('data-coins'));
+    const nomeCompleto = `${nomePremio} R$ ${valorBRL}`;
+
+    solicitarResgateInterno(premioId, nomeCompleto, precoCoins);
+};
   
   // ==========================================
   // ABA: MEUS RESGATES (HISTÓRICO DO FUNCIONÁRIO)
   // ==========================================
   window.verCodigoResgate = function(codigo) {
-    if (!codigo || codigo === 'undefined' || codigo === '') {
+    if (!codigo || String(codigo) === 'undefined' || String(codigo).trim() === '') {
         return showToast('O código ainda não foi inserido pelo gestor.', 'error');
     }
-    showConfirm(
-        `<div style="text-align: center; margin-top: 10px;">
-            <p style="font-size: 14px; margin-bottom: 15px; color: var(--color-text-secondary);">Copie o seu código abaixo:</p>
-            <div style="background: rgba(16, 185, 129, 0.1); border: 2px dashed var(--color-primary); padding: 15px; border-radius: 8px; font-size: 22px; font-weight: 900; color: var(--color-primary); user-select: all; cursor: pointer;">
-                ${codigo}
-            </div>
-        </div>`,
-        () => { }, '🎁 O Seu Prêmio Chegou!'
-    );
+
+    const codTexto = String(codigo).trim();
+    const modal = document.getElementById('modalVerPin');
+    const box = document.getElementById('pinBoxDisplay');
+    const btnCopy = document.getElementById('btnCopiarPinModal');
+
+    if (!modal || !box) {
+        return alert(`O seu código é: ${codTexto}`);
+    }
+
+    box.textContent = codTexto;
+
+    if (btnCopy) {
+        btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Código';
+        btnCopy.style.background = 'var(--color-primary)';
+        btnCopy.onclick = function() {
+            navigator.clipboard.writeText(codTexto).then(() => {
+                btnCopy.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+                btnCopy.style.background = '#059669';
+                setTimeout(() => {
+                    btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Código';
+                    btnCopy.style.background = 'var(--color-primary)';
+                }, 2000);
+            });
+        };
+    }
+
+    modal.classList.remove('hidden');
   };
   
   window.loadFuncRedemptions = function() {
     const container = document.getElementById('listaMeusResgates');
     if (!container) return;
   
-    container.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> A carregar...</div>';
+    container.innerHTML = '<div style="text-align:center; padding:40px; color: var(--color-text-secondary);"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;">A carregar resgates...</p></div>';
   
-    db.collection('resgates').where('userId', '==', currentUser.id).get().then(snap => {
+    const idStr = String(currentUser.id);
+    const idNum = Number(currentUser.id);
+    db.collection('resgates').where('userId', 'in', [idStr, idNum]).get().then(snap => {
         if (snap.empty) {
-            container.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.6;">Ainda não tens resgates feitos.</div>';
+            container.innerHTML = `
+            <div class="card" style="padding: 40px; text-align: center; border-radius: 16px; border: 1px solid var(--color-border); background: var(--color-bg-secondary);">
+                <i class="fa-solid fa-box-open" style="font-size: 42px; color: var(--color-text-secondary); opacity: 0.5; margin-bottom: 12px; display: block;"></i>
+                <h4 style="margin: 0 0 6px 0; color: var(--color-text-primary); font-size: 16px;">Nenhum resgate encontrado</h4>
+                <p style="margin: 0; color: var(--color-text-secondary); font-size: 13px;">Você ainda não realizou nenhum resgate na loja.</p>
+            </div>`;
             return;
         }
   
-        let html = '<div class="table-container"><table><thead><tr><th>Data</th><th>Prêmio</th><th>Coins</th><th>Status / Ação</th></tr></thead><tbody>';
         let lista = [];
         snap.forEach(doc => lista.push(doc.data()));
         lista.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
   
+        let html = `<div style="display: flex; flex-direction: column; gap: 12px;">`;
+  
         lista.forEach(r => {
             const dataP = new Date(r.createdAt).toLocaleDateString('pt-BR');
             let acaoHtml = '';
+            let ribbonColor = 'var(--color-warning)';
+            let badgeStatus = '';
             
             if (r.status === 'pendente') {
-                acaoHtml = '<span class="badge" style="background:#fef9c3; color:#ca8a04;">Aguardando Gestor</span>';
-            } else if (r.status === 'aprovado') {
-                if(r.tipo === 'interno') {
-                   acaoHtml = '<span class="badge" style="background:#dcfce7; color:#166534;"><i class="fa-solid fa-check"></i> Autorizado</span>';
-                } else {
-                   const pinSeguro = r.codigoResgate || r.pin || ''; 
-                   acaoHtml = `<button class="btn btn-small" style="background:var(--color-primary); color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;" onclick="window.verCodigoResgate('${pinSeguro}')">
-                        <i class="fa-solid fa-gift"></i> Ver PIN
-                    </button>`;
+                ribbonColor = '#f59e0b';
+                badgeStatus = `<span style="background: rgba(245,158,11,0.12); color: #b45309; border: 1px solid rgba(245,158,11,0.3); font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-clock" style="font-size:10px;"></i> Aguardando</span>`;
+            } else if (r.status === 'aprovado' || r.status === 'entregue') {
+                ribbonColor = '#10b981';
+                badgeStatus = `<span style="background: rgba(16,185,129,0.12); color: #047857; border: 1px solid rgba(16,185,129,0.3); font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-check" style="font-size:10px;"></i> Autorizado</span>`;
+                const pinSeguro = String(r.codigoResgate || r.pin || '');
+                if (pinSeguro && pinSeguro.trim() !== '') {
+                   acaoHtml = `<button style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none; padding:5px 12px; border-radius:6px; cursor:pointer; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:5px; box-shadow: 0 2px 8px rgba(16,185,129,0.3);" onclick="window.verCodigoResgate('${pinSeguro}')"><i class="fa-solid fa-key" style="font-size:11px;"></i> Ver PIN</button>`;
                 }
             } else {
-                acaoHtml = '<span class="badge" style="background:#fee2e2; color:#dc2626;">Devolvido / Recusado</span>';
+                ribbonColor = '#ef4444';
+                badgeStatus = `<span style="background: rgba(239,68,68,0.12); color: #b91c1c; border: 1px solid rgba(239,68,68,0.3); font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-circle-xmark" style="font-size:10px;"></i> Recusado</span>`;
             }
   
-            html += `<tr><td>${dataP}</td><td><strong>${r.premioNome}</strong></td><td><span style="color:#b45309; font-weight:bold;">${r.preco} <i class="fa-solid fa-coins"></i></span></td><td>${acaoHtml}</td></tr>`;
+            html += `
+            <div class="card" style="padding: 12px 16px 12px 20px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: relative; overflow: hidden; margin-bottom: 0;">
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ${ribbonColor}; border-radius: 10px 0 0 10px;"></div>
+                
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px;">
+                    <div style="background: rgba(255,255,255,0.05); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--color-border);">
+                        <i class="fa-solid fa-gift" style="font-size: 16px; color: var(--color-primary);"></i>
+                    </div>
+                    <div>
+                        <p style="margin: 0 0 3px 0; font-size: 14px; font-weight: 700; color: var(--color-text-primary); line-height: 1.2;">${r.premioNome}</p>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-secondary);">
+                            <span style="display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-calendar-day" style="font-size:11px;"></i> ${dataP}</span>
+                            <span style="opacity:0.4;">•</span>
+                            <span style="color: #d97706; font-weight: 700; font-size: 12px; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                <img src="Patentes/Moedas/GoCoins.svg" alt="Coins" style="width: 14px; height: 14px; object-fit: contain;">
+                                ${r.preco} GoCoins
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    ${badgeStatus}
+                    ${acaoHtml || ''}
+                </div>
+            </div>`;
         });
   
-        html += '</tbody></table></div>';
+        html += `</div>`;
         container.innerHTML = html;
+    }).catch(err => {
+        console.error('Erro ao carregar resgates:', err);
+        container.innerHTML = '<div style="padding:20px; text-align:center; color: var(--color-danger);"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao carregar resgates. Tente novamente.</div>';
     });
   };
   
@@ -1255,7 +1429,7 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
     window.renderStudio();
   };
   
-  window.salvarPerfilStudioFuncionario = function(btn) {
+  window.salvarPerfilStudioFuncionario = async function(btn) {
   const original = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
   btn.disabled = true;
@@ -1273,14 +1447,22 @@ window.solicitarResgateInterno = async function(premioId, nomePremio, precoCoins
       showToast('O nome não pode estar vazio!', 'error'); 
       btn.innerHTML = original; btn.disabled = false; return; 
   }
+
+  if (novaSenha) {
+      // A senha é alterada no Firebase Auth (nunca gravada no Firestore)
+      try {
+          await firebase.auth().currentUser.updatePassword(novaSenha);
+      } catch (err) {
+          showToast('Erro ao alterar senha: ' + (err.message || 'tente novamente'), 'error');
+          btn.innerHTML = original; btn.disabled = false; return;
+      }
+  }
   
   const updates = { name: novoNome };
-  if (novaSenha) updates.password = novaSenha;
   if (novoAvatar) updates.avatarUrl = novoAvatar;
   
   db.collection('usuarios').doc(currentUser.id.toString()).update(updates).then(() => {
       currentUser.name = novoNome;
-      if (novaSenha) currentUser.password = novaSenha;
       if (novoAvatar) currentUser.avatarUrl = novoAvatar;
   
       const uIndex = users.findIndex(x => x.id === currentUser.id);

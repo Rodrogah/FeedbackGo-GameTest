@@ -1,11 +1,38 @@
 <div class="fade-entrar">
-    <div style="margin-bottom: 20px;">
-        <h2 style="display: flex; align-items: center; gap: 10px;">
+    <div style="margin-bottom: 24px;">
+        <h2 style="display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 700;">
             <i class="fa-solid fa-ticket" style="color: var(--color-primary);"></i> Meus Resgates
         </h2>
-        <p style="color: var(--color-text-secondary); font-size: 14px;">Consulta aqui os teus prémios e códigos.</p>
+        <p style="color: var(--color-text-secondary); font-size: 14px; margin-top: 4px;">Consulta aqui os teus prémios, status de aprovação e códigos de resgate.</p>
     </div>
 
-    <div class="card" id="listaMeusResgates">
+    <div id="listaMeusResgates"></div>
+</div>
+
+<!-- Modal dedicado para exibição do PIN / Código -->
+<div id="modalVerPin" class="modal-overlay hidden" style="z-index: 10000;">
+    <div class="modal-content" style="max-width: 420px; border-radius: 20px; text-align: center; padding: 28px 24px; position: relative;">
+        <button onclick="document.getElementById('modalVerPin').classList.add('hidden')" style="position: absolute; right: 18px; top: 18px; background: none; border: none; color: var(--color-text-secondary); font-size: 18px; cursor: pointer;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div style="width: 56px; height: 56px; background: rgba(16, 185, 129, 0.12); color: var(--color-primary); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px auto;">
+            <i class="fa-solid fa-gift"></i>
         </div>
+
+        <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 700; color: var(--color-text-primary);">O Seu Prêmio Chegou!</h3>
+        <p style="margin: 0 0 20px 0; font-size: 13px; color: var(--color-text-secondary);">Copie o seu código abaixo para resgatar:</p>
+
+        <div id="pinBoxDisplay" style="background: rgba(16, 185, 129, 0.08); border: 2px dashed var(--color-primary); padding: 16px; border-radius: 14px; font-size: 26px; font-weight: 900; color: var(--color-primary); user-select: all; letter-spacing: 3px; margin-bottom: 20px; word-break: break-all;">
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button id="btnCopiarPinModal" class="btn btn-primary" style="flex: 1; padding: 12px; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i class="fa-solid fa-copy"></i> Copiar Código
+            </button>
+            <button onclick="document.getElementById('modalVerPin').classList.add('hidden')" class="btn btn-secondary" style="padding: 12px 20px; border-radius: 10px; font-weight: 700;">
+                Fechar
+            </button>
+        </div>
+    </div>
 </div>

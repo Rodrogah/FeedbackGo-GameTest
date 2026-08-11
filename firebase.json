@@ -1,0 +1,47 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "*.rules",
+      "package.json",
+      "package-lock.json",
+      "firestore.indexes.json",
+      "*.ps1",
+      "*.env",
+      "capacitor.config.json",
+      "build.js",
+      "prepare_dist.js",
+      "copy_firestore.js",
+      "debug_auth_read.js",
+      "migrate_to_auth.js",
+      "reset_db.js",
+      "test_firestore.js",
+      "test_jsdom.js",
+      "test_pup.js",
+      "functions/**",
+      "**/*.min.js"
+    ]
+  }
+}

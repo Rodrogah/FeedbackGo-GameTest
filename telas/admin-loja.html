@@ -10,41 +10,145 @@
     </div>
 
     <div id="tabCatalogo" class="store-section" style="display: block;">
-        <div class="form-grid">
-            <div class="card" style="margin-bottom: 0;">
-                <h3><i class="fa-solid fa-plus-circle"></i> Adicionar Prêmio</h3>
-                <form id="adminNewRewardForm" style="margin-top: 15px;">
-                    <div class="form-group">
-                        <label>Nome do Prêmio</label>
-                        <input type="text" id="rewardName" placeholder="Ex: iFood R$ 50,00" required>
+        <div style="display: grid; grid-template-columns: 1fr auto minmax(260px, 0.85fr); gap: 18px; align-items: stretch;">
+            
+            <!-- Column 1: Adicionar Prêmio -->
+            <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column; padding: 24px; border-radius: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border);">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--color-primary), #6366f1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fa-solid fa-plus" style="color: #fff; font-size: 14px;"></i>
                     </div>
-                    <div class="form-group">
-                        <label>Preço em GoCoins</label>
-                        <input type="number" id="rewardPrice" placeholder="Ex: 500" required min="1">
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 1px;">
+                        <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.1;">Adicionar Prêmio</h3>
+                        <p style="margin: 0; font-size: 11px; color: var(--color-text-secondary); opacity: 0.7; line-height: 1.1;">Cadastre um novo item no catálogo</p>
                     </div>
-                    <div class="form-group full-width">
-                        <label>Descrição</label>
-                        <textarea id="rewardDesc" rows="2" placeholder="Ex: Cartão presente digital do iFood..."></textarea>
+                </div>
+
+                <form id="adminNewRewardForm" style="display: flex; flex-direction: column; gap: 18px; flex: 1;">
+
+                    <!-- Image Upload -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <label style="font-size:12px; font-weight:700; color:var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Imagem</label>
+                            <span style="font-size:10px; color:var(--color-text-secondary); opacity:0.6; background: var(--color-bg-secondary); padding: 2px 8px; border-radius: 6px;">400 × 250 px ideal</span>
+                        </div>
+                        <div id="rewardImageUploadArea" onclick="document.getElementById('rewardImageInput').click()" style="width:100%; height:110px; border:2px dashed var(--color-border); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; background:var(--color-bg-secondary); transition:border-color 0.2s, background 0.2s; overflow:hidden; position:relative;">
+                            <div id="rewardImagePlaceholder" style="display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none;">
+                                <div style="width:40px; height:40px; border-radius:50%; background: rgba(99,102,241,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--color-primary);">
+                                    <i class="fa-solid fa-image"></i>
+                                </div>
+                                <span style="font-size:12px; color:var(--color-text-secondary);">Clique para anexar imagem</span>
+                            </div>
+                            <img id="rewardImagePreview" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; position:absolute; inset:0; border-radius:10px;">
+                        </div>
+                        <input type="file" id="rewardImageInput" accept="image/*" style="display:none;" onchange="previewRewardImage(event)">
+                        <input type="hidden" id="rewardImageBase64">
                     </div>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Cadastrar Prêmio</button>
+
+                    <!-- Valores -->
+                    <div>
+                        <label style="font-size:12px; font-weight:700; color:var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom:8px; display:block;">Valores (R$)</label>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                            <button type="button" style="width:40px; height:40px; border-radius:10px; background:var(--color-primary); color:#fff; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; border:none;" onclick="addRewardValue()">
+                                <i class="fa-solid fa-plus" style="font-size: 14px;"></i>
+                            </button>
+                            <input type="number" id="rewardValueInput" placeholder="Ex: 50" min="1" style="flex:1; padding:10px 14px; border-radius:10px; border:1px solid var(--color-border); background:var(--color-bg-secondary); color:var(--color-text-primary); font-size:14px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addRewardValue();}">
+                        </div>
+                        <div id="rewardValuesChips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:28px;"></div>
+                    </div>
+
+                    <!-- Nome do Prêmio -->
+                    <div>
+                        <label style="font-size:12px; font-weight:700; color:var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom:8px; display:block;">Nome do prêmio</label>
+                        <input type="text" id="rewardName" placeholder="Ex: iFood, Voucher Amazon…" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--color-border); background:var(--color-bg-secondary); color:var(--color-text-primary); font-size:14px; box-sizing:border-box;" oninput="updateLivePreview()">
+                    </div>
+
+                    <!-- Prêmio com código -->
+                    <div>
+                        <label style="font-size:12px; font-weight:700; color:var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom:8px; display:block;">Prêmio com código</label>
+                        <div style="display:inline-flex; border-radius:10px; overflow:hidden; border:1px solid var(--color-border);">
+                            <button type="button" id="rewardCodigoSim" onclick="selectRewardCodigo(true)" style="padding:9px 28px; border:none; cursor:pointer; font-size:13px; font-weight:600; background:var(--color-primary); color:#fff; transition:background 0.2s, color 0.2s;">Sim</button>
+                            <button type="button" id="rewardCodigoNao" onclick="selectRewardCodigo(false)" style="padding:9px 28px; border:none; cursor:pointer; font-size:13px; font-weight:600; background:var(--color-bg-secondary); color:var(--color-text-secondary); transition:background 0.2s, color 0.2s;">Não</button>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="rewardTemCodigo" value="true">
+                    <button type="submit" class="btn btn-primary" style="width:100%; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; margin-top: auto;">
+                        <i class="fa-solid fa-floppy-disk"></i> Cadastrar Prêmio
+                    </button>
                 </form>
             </div>
 
-            <div class="card" style="margin-bottom: 0;">
-                <h3><i class="fa-solid fa-tags"></i> Prêmios Disponíveis</h3>
-                <div id="adminRewardsList" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+            <!-- Column 2: Prévia na Loja -->
+            <div style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 16px; background: radial-gradient(ellipse at 50% 20%, rgba(99,102,241,0.18) 0%, transparent 70%), var(--color-bg-secondary); border: 1px solid var(--color-border); padding: 44px 16px 16px; position: relative; overflow: hidden;">
+                <!-- Decorative grid background -->
+                <div style="position: absolute; inset: 0; opacity: 0.04; background-image: linear-gradient(var(--color-text-primary) 1px, transparent 1px), linear-gradient(90deg, var(--color-text-primary) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none;"></div>
+
+                <!-- Label -->
+                <div style="position: absolute; top: 16px; left: 20px; display: flex; align-items: center; gap: 6px; opacity: 0.5;">
+                    <i class="fa-solid fa-eye" style="font-size: 11px;"></i>
+                    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Prévia na Loja</span>
+                </div>
+
+                <!-- Subtle glow behind card -->
+                <div style="position: absolute; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,0.25), transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;"></div>
+
+                <!-- Inner card — exact same size as loja do funcionário -->
+                <div class="card reward-card" style="padding: 15px; text-align: center; border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; justify-content: space-between; background: var(--color-bg-primary); width: 220px; box-sizing: border-box; flex-shrink: 0; position: relative; z-index: 1;">
+                    <div>
+                        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); width: 100%; height: 130px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 15px; color: white; overflow: hidden;">
+                            <div id="livePreviewImgContainer" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <i id="livePreviewDefaultIcon" class="fa-solid fa-star" style="font-size: 40px; color: #fbbf24;"></i>
+                                <img id="livePreviewImg" src="" alt="" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+                            </div>
+                        </div>
+                        <h3 id="livePreviewTitle" style="margin: 0 0 15px 0; font-size: 16px; color: var(--color-text-primary); word-break: break-word;">Nome do Prêmio</h3>
+                    </div>
+                    <div>
+                        <select id="livePreviewSelect" style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid var(--color-border); font-size: 13px; background: var(--color-bg-secondary); color: var(--color-text-primary); cursor: pointer;">
+                            <option value="">Escolha o valor...</option>
+                        </select>
+                        <button class="btn" style="width: 100%; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 14px; cursor: default; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 10px rgba(4, 120, 87, 0.3);" onclick="event.preventDefault();">
+                            <img src="Patentes/Moedas/GoCoins.svg" alt="Coins" style="width: 22px; height: 22px; object-fit: contain;"> Resgatar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 3: Prêmios Disponíveis -->
+            <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column; padding: 24px; border-radius: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border);">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fa-solid fa-tags" style="color: #fff; font-size: 13px;"></i>
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 1px;">
+                        <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.1;">Prêmios Disponíveis</h3>
+                        <p style="margin: 0; font-size: 11px; color: var(--color-text-secondary); opacity: 0.7; line-height: 1.1;">Catálogo ativo da empresa</p>
+                    </div>
+                </div>
+                <div id="adminRewardsList" style="display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto;">
                     <div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</div>
                 </div>
             </div>
+
         </div>
     </div>
 
     <div id="tabResgates" class="store-section" style="display: none;">
-        <div class="card">
-            <h3><i class="fa-solid fa-bell-concierge"></i> Pedidos Pendentes de Funcionários</h3>
-            <div id="adminRedemptionList" style="margin-top: 15px;">
-                <div style="text-align:center; padding:20px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</div>
+        <div class="card" style="padding: 24px; border-radius: 16px; margin-bottom: 0;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border);">
+                <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fa-solid fa-bell-concierge" style="color: #fff; font-size: 14px;"></i>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: center; gap: 1px;">
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.1;">Pedidos Pendentes de Funcionários</h3>
+                    <p style="margin: 0; font-size: 11px; color: var(--color-text-secondary); opacity: 0.7; line-height: 1.1;">Aprove ou cancele resgates solicitados pela equipe</p>
+                </div>
+            </div>
+            <div id="adminRedemptionList">
+                <div style="text-align:center; padding:30px; opacity:0.6;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</div>
             </div>
         </div>
     </div>
+
 </div>

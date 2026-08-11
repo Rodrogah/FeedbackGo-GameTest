@@ -33,25 +33,30 @@
   <div id="areaAvisosGamificacao"></div>
 
   <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
-    <div style="flex: 1; min-width: 200px;">
-        <h3 style="color: white; border: none; padding: 0; margin-bottom: 10px; font-size: 18px;">
-            <i class="fa-solid fa-medal" style="color: #fbbf24;"></i> Nível <span id="userLevelDisplay">1</span>: <span id="userTitleDisplay" style="opacity: 0.8; font-weight: normal; font-size: 14px;">Iniciante</span>
-        </h3>
-        <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 12px; width: 100%; position: relative; overflow: hidden;">
-            <div id="xpProgressBar" style="background: var(--color-primary); height: 100%; width: 0%; transition: width 1s ease-in-out; border-radius: 20px; box-shadow: 0 0 10px var(--color-primary);"></div>
+    <div style="display: flex; align-items: center; gap: 15px; flex: 1; min-width: 250px;">
+        <div id="userRankingBadge" style="width: 54px; height: 54px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); cursor: pointer;" title="Ver Patentes" onclick="window.mostrarListaPatentes()">
+            <i class="fa-solid fa-medal" style="color: #fbbf24; font-size: 24px;"></i>
         </div>
-        <p style="font-size: 12px; margin-top: 8px; opacity: 0.8;">
-            <span id="currentXpDisplay">0</span> / <span id="nextLevelXpDisplay">500</span> XP para o próximo nível
-        </p>
+        <div style="flex: 1;">
+            <h3 style="color: white; border: none; padding: 0; margin-bottom: 8px; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                Nível <span id="userLevelDisplay">1</span> : <span id="userTitleDisplay" style="opacity: 0.9; font-weight: 600; font-size: 15px;">Recruta</span>
+            </h3>
+            <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 12px; width: 100%; position: relative; overflow: hidden;">
+                <div id="xpProgressBar" style="background: var(--color-primary); height: 100%; width: 0%; transition: width 1s ease-in-out; border-radius: 20px; box-shadow: 0 0 10px var(--color-primary);"></div>
+            </div>
+            <p style="font-size: 12px; margin-top: 8px; opacity: 0.8;">
+                <span id="currentXpDisplay">0</span> / <span id="nextLevelXpDisplay">500</span> XP para o próximo nível
+            </p>
+        </div>
     </div>
     
-    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); padding: 15px 25px; border-radius: 12px; text-align: center;">
-        <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; color: var(--color-primary); font-weight: bold;">Saldo Atual</p>
-        <h2 style="margin: 0; font-size: 26px; color: white; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-coins" style="color: #fbbf24;"></i> 
-            <span id="goCoinsDisplay">0</span> 
-        </h2>
-    </div>
+    <div style="background: linear-gradient(135deg, #06b6d4 0%, #059669 50%, #064e3b 100%); padding: 15px 25px; border-radius: 12px; text-align: center; box-shadow: 0 8px 30px rgba(6, 182, 212, 0.25), 0 4px 15px rgba(5, 150, 105, 0.3);">
+         <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; color: rgba(255, 255, 255, 0.9) !important; font-weight: bold;">Saldo Atual</p>
+         <h2 style="margin: 0; font-size: 26px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px;">
+             <img src="Patentes/Moedas/Amount_GoCoins.svg" style="width: 50px; height: 50px;" alt="GoCoins"> 
+             <span id="goCoinsDisplay">0</span> 
+         </h2>
+     </div>
   </div>
 
   <div class="card" style="margin-bottom: 24px; border: 2px solid var(--color-primary); background: rgba(16, 185, 129, 0.03);">

@@ -1,12 +1,12 @@
 // ============ 1. INTEGRAÇÃO FIREBASE & EMAIL ============
 const firebaseConfig = {
-  apiKey: "AIzaSyDNP3BqvD2udl05uIIQ4-VYqJAL7LpaKoE",
-  authDomain: "feedbackgo---game-test.firebaseapp.com",
-  projectId: "feedbackgo---game-test",
-  storageBucket: "feedbackgo---game-test.firebasestorage.app",
-  messagingSenderId: "360325357568",
-  appId: "1:360325357568:web:760dba4d389ae3b3c438e5",
-  measurementId: "G-R1WY7CLLS7"
+  apiKey: "AIzaSyCzNiOwGdmaOUlQ3_UMNw0TX6w3JO3vXVE",
+  authDomain: "feedbackgooficial.firebaseapp.com",
+  projectId: "feedbackgooficial",
+  storageBucket: "feedbackgooficial.firebasestorage.app",
+  messagingSenderId: "531915627918",
+  appId: "1:531915627918:web:5210c0851b4ae9b088d8df",
+  measurementId: "G-6N68F5759T"
 };
 if (!firebase.apps.length) {
 firebase.initializeApp(firebaseConfig);
@@ -34,6 +34,21 @@ const defaultCategories = [
 'Vendas',
 'Formação',
 ];
+
+// ============ SANITIZAÇÃO DE SAÍDA (anti stored-XSS) ============
+// Use esc() para injetar TEXTO dentro de HTML e escAttr() para injeção
+// dentro de atributo (ex.: onclick="...").
+window.esc = function (v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+};
+window.escAttr = function (v) {
+  return String(v == null ? '' : v).replace(/[&"'<>]/g, c => ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[c]));
+};
+// Apenas URLs http(s) são aceitas em imagens/links (bloqueia javascript:, data: e svg inline)
+window.safeUrl = function (v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^(https?:)?\/\//i.test(s) || /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/i.test(s) ? s : '';
+};
 
 // ============ 3. MÁGICA DO TEMPO REAL (NOVA ARQUITETURA) ============
 let loadState = { emp: false, usr: false, act: false };
@@ -103,17 +118,17 @@ if (currentUser.role === 'admin') {
 }
 
 // ============ 4. EMAILS ============
-function sendWelcomeEmail(userName, userEmail, userPass) {
+function sendWelcomeEmail(userName, userEmail) {
 const comp = companies.find((c) => c.id === currentUser.companyId);
 emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_GENERIC, {
   to_name: userName,
   to_email: userEmail,
   subject: 'Bem-vindo à ' + (comp ? comp.name : 'FeedbackGo'),
   message_title: 'Sua conta foi criada',
-  message_body: 'Seus dados de acesso:',
-  label_destaque: 'Senha',
-  password: userPass,
-  extra_info: 'Altere a senha após o login.',
+  message_body: 'Você já pode aceder com o seu e-mail. Se ainda não sabe a senha, use a opção "Esqueci a senha" na tela de login para a definir.',
+  label_destaque: 'Ativação',
+  password: 'Use "Esqueci a senha" na tela de login',
+  extra_info: 'Nunca partilhe a sua senha.',
   company_name: comp ? comp.name : 'FeedbackGo',
 });
 }
@@ -349,16 +364,66 @@ return `--cat-hue: ${hue}; --txt-l: ${textLightness};`;
 // ============ 8. SISTEMA DE CONFIRMAÇÃO & TOASTS ============
 window.currentConfirmCallback = null;
 
-window.showConfirm = function(message, callback, title = 'Atenção', btnText = 'Sim, Apagar', btnClass = 'btn-danger') {
+window.showConfirm = function(message, callback, title = 'Atenção', btnText = 'Sim, Apagar', btnClass = 'btn-danger', cancelText = 'Cancelar') {
     document.getElementById('confirmTitle').innerHTML = title; 
     document.getElementById('confirmMessage').innerHTML = message; 
     window.currentConfirmCallback = callback;
     
-    // Altera dinamicamente o aspeto do botão de ação
+    // Configura ícone e tema dinâmico baseado no contexto
+    let iconClass = 'fa-solid fa-triangle-exclamation';
+    let themeClass = 'warning';
+    
+    const titleLower = String(title || '').toLowerCase();
+    const btnClassLower = String(btnClass || '').toLowerCase();
+    const btnTextLower = String(btnText || '').toLowerCase();
+    
+    if (titleLower.includes('apagar') || titleLower.includes('excluir') || titleLower.includes('remover') || btnClassLower.includes('danger')) {
+        iconClass = 'fa-solid fa-trash-can';
+        themeClass = 'danger';
+    } else if (titleLower.includes('entrega') || titleLower.includes('entregar') || titleLower.includes('resgate') || titleLower.includes('resgatar') || titleLower.includes('prêmio') || titleLower.includes('premio') || btnTextLower.includes('entregar') || btnTextLower.includes('confirmar entrega')) {
+        iconClass = 'fa-solid fa-gift';
+        themeClass = 'success';
+    } else if (btnClassLower.includes('success')) {
+        iconClass = 'fa-solid fa-circle-check';
+        themeClass = 'success';
+    } else if (titleLower.includes('atenção') || titleLower.includes('atencao') || titleLower.includes('alerta') || btnClassLower.includes('warning')) {
+        iconClass = 'fa-solid fa-triangle-exclamation';
+        themeClass = 'warning';
+    } else {
+        iconClass = 'fa-solid fa-circle-info';
+        themeClass = 'info';
+    }
+    
+    // Atualiza wrapper e ícone se existirem na tela
+    const iconWrapper = document.getElementById('confirmIconWrapper');
+    const iconEl = document.getElementById('confirmIcon');
+    if (iconWrapper) {
+        if (message.includes('font-size: 40px') || message.includes('font-size: 48px') || message.includes('fa-coins') || message.includes('fa-star') || message.includes('codigoResgateBox')) {
+            iconWrapper.style.display = 'none';
+        } else {
+            iconWrapper.style.display = 'flex';
+            iconWrapper.className = `confirm-icon-wrapper ${themeClass}`;
+        }
+    }
+    if (iconEl) {
+        iconEl.className = iconClass;
+    }
+    
+    // Altera dinamicamente os botões
     const actionBtn = document.getElementById('confirmActionBtn');
     if (actionBtn) {
-        actionBtn.innerHTML = btnText;
-        actionBtn.className = `btn btn-small ${btnClass}`; 
+        if (btnText === null || btnText === false) {
+            actionBtn.style.display = 'none';
+        } else {
+            actionBtn.style.display = '';
+            actionBtn.innerHTML = btnText;
+            actionBtn.className = `btn ${btnClass}`;
+        }
+    }
+
+    const cancelBtn = document.querySelector('#confirmModal .confirm-buttons-wrapper .btn-secondary');
+    if (cancelBtn) {
+        cancelBtn.textContent = cancelText || 'Fechar';
     }
     
     document.getElementById('confirmModal').classList.remove('hidden');
@@ -805,17 +870,26 @@ let ranking = Object.keys(xpPorUsuario).map(userId => {
   let avatarVisual = '?';
   if (u) {
       if (u.avatarUrl) {
-          avatarVisual = `<img src="${u.avatarUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+          avatarVisual = `<img src="${safeUrl(u.avatarUrl)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
       } else {
           avatarVisual = u.name.charAt(0).toUpperCase();
       }
+  }
+
+  // Usa o level do currentUser quando for o próprio usuário (mais atualizado que o cache do array users)
+  let nivel = 1;
+  if (currentUser && String(currentUser.id) === String(userId)) {
+      nivel = currentUser.level || 1;
+  } else if (u) {
+      nivel = u.level || 1;
   }
 
   return {
       userId: parseInt(userId),
       nome: u ? u.name.split(' ')[0] : 'Membro',
       xp: xpPorUsuario[userId],
-      avatar: avatarVisual
+      avatar: avatarVisual,
+      level: nivel
   };
 }).sort((a, b) => b.xp - a.xp).slice(0, 5);
 
@@ -848,8 +922,9 @@ posicoes.forEach((col) => {
             ${col.crown ? '<i class="fa-solid fa-crown" style="color: #fbbf24; font-size: 32px; margin-bottom: -5px; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));"></i>' : ''}
             <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--color-bg-primary); border: 3px solid ${col.bg.split(' ')[2]}; color: var(--color-text-primary); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; z-index: 2; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">${col.user.avatar}</div>
             <div style="font-size: 13px; font-weight: 800; margin: 8px 0 2px 0; color: var(--color-text-primary); text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${col.user.nome}</div>
+            ${(typeof renderPatenteBadge === 'function') ? `<div style="margin-bottom: 4px;">${renderPatenteBadge(col.user.level, 'xsmall')}</div>` : ''}
             <div style="font-size: 12px; font-weight: 900; color: var(--color-primary); margin-bottom: 2px;">${col.user.xp} XP</div>
-            <div style="font-size: 10px; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 2px 6px; border-radius: 6px; margin-bottom: 8px;">+${premios[col.idxCoins]} <i class="fa-solid fa-coins"></i></div>
+            <div style="font-size: 10px; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 2px 6px; border-radius: 6px; margin-bottom: 8px;">+${premios[col.idxCoins]} <img src="Patentes/Moedas/GoCoins.svg" alt="GoCoins" style="width:14px;height:14px;vertical-align:middle;object-fit:contain;"></div>
             <div style="height: ${col.h}; width: 100%; background: ${col.bg}; border-radius: 8px 8px 0 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 10px; color: ${col.corTxt}; font-size: 28px; font-weight: 900; box-shadow: inset 0 2px 5px rgba(255,255,255,0.4), 0 -2px 10px rgba(0,0,0,0.1);">${col.label}</div>
         </div>`;
     } else {
@@ -913,86 +988,7 @@ observerTelas.observe(document.body, { childList: true, subtree: true });
 // ==========================================
 // CATÁLOGO DE GIFT CARDS E ORÇAMENTO MENSAL
 // ==========================================
-window.apiGiftCardsCatalog = [
-  {
-      id: 'uber', name: 'Uber (Uber Cash)', 
-      bgColor: '#000000', logoUrl: 'https://cdn.simpleicons.org/uber/ffffff', fallbackIcon: 'fa-brands fa-uber',
-      descricao: 'Créditos para viagens ou compras no app.',
-      options: [ { brl: 25, sku: 'UBER-25' }, { brl: 50, sku: 'UBER-50' }, { brl: 100, sku: 'UBER-100' } ]
-  },
-  {
-      id: 'netflix', name: 'Netflix', 
-      bgColor: '#000000', logoUrl: 'https://cdn.simpleicons.org/netflix/E50914', fallbackIcon: 'fa-solid fa-film',
-      descricao: 'Assinatura para filmes e séries.',
-      options: [ { brl: 35, sku: 'NETFLIX-35' }, { brl: 50, sku: 'NETFLIX-50' } ]
-  },
-  {
-      id: 'spotify', name: 'Spotify Premium', 
-      bgColor: '#1ED760', logoUrl: 'https://cdn.simpleicons.org/spotify/ffffff', fallbackIcon: 'fa-brands fa-spotify',
-      descricao: 'Música sem anúncios e offline.',
-      options: [ { brl: 17, sku: 'SPOTIFY-17' }, { brl: 35, sku: 'SPOTIFY-35' }, { brl: 50, sku: 'SPOTIFY-50' } ]
-  },
-  {
-      id: 'xbox', name: 'Xbox', 
-      bgColor: '#107C10', logoUrl: '', fallbackIcon: 'fa-brands fa-xbox', 
-      descricao: 'Jogos, DLCs ou assinatura Game Pass.',
-      options: [ { brl: 50, sku: 'XBOX-50' }, { brl: 100, sku: 'XBOX-100' } ]
-  },
-  {
-      id: 'playstation', name: 'PlayStation', 
-      bgColor: '#00439C', logoUrl: 'https://cdn.simpleicons.org/playstation/ffffff', fallbackIcon: 'fa-brands fa-playstation',
-      descricao: 'Créditos na PSN Store ou PS Plus.',
-      options: [ { brl: 30, sku: 'PSN-30' }, { brl: 50, sku: 'PSN-50' }, { brl: 100, sku: 'PSN-100' } ]
-  },
-  {
-      id: 'steam', name: 'Steam', 
-      bgColor: '#163E58', logoUrl: 'https://cdn.simpleicons.org/steam/ffffff', fallbackIcon: 'fa-brands fa-steam',
-      descricao: 'Jogos para PC na maior loja do mundo.',
-      options: [ { brl: 30, sku: 'STEAM-30' }, { brl: 50, sku: 'STEAM-50' }, { brl: 100, sku: 'STEAM-100' } ]
-  },
-  {
-      id: 'googleplay', name: 'Google Play', 
-      bgColor: '#FFFFFF', logoUrl: 'https://helios-i.mashable.com/imagery/articles/06YkoiA6HHEVTWDiXFiFsw4/hero-image.fill.size_1248x702.v1658745007.png', fallbackIcon: 'fa-brands fa-google-play',
-      descricao: 'Apps, jogos, filmes e livros para Android.',
-      options: [ { brl: 15, sku: 'GPLAY-15' }, { brl: 30, sku: 'GPLAY-30' }, { brl: 50, sku: 'GPLAY-50' } ]
-  },
-  {
-      id: 'apple', name: 'App Store', 
-      bgColor: '#1CAEF7', logoUrl: 'https://cdn.simpleicons.org/apple/ffffff', fallbackIcon: 'fa-brands fa-apple',
-      descricao: 'Apps, jogos, iCloud e Apple Music.',
-      options: [ { brl: 20, sku: 'APPLE-20' }, { brl: 50, sku: 'APPLE-50' } ]
-  },
-  {
-    id: 'zedelivery', name: 'Zé Delivery', 
-    bgColor: '#FECE1D', 
-    logoUrl: 'https://brandlogos.net/wp-content/uploads/2025/11/ze_delivery-logo_brandlogos.net_ubfml.png', 
-    fallbackIcon: 'fa-solid fa-beer-mug-empty',
-    descricao: 'Bebidas geladas entregues em minutos.',
-    options: [ { brl: 30, sku: 'ZE-30' }, { brl: 50, sku: 'ZE-50' } ]
-  },
-  {
-    id: 'outback', name: 'Outback', 
-    bgColor: '#FCAC4F', 
-    logoUrl: 'https://logodownload.org/wp-content/uploads/2016/09/outback-logo-1.png', 
-    fallbackIcon: 'fa-solid fa-utensils',
-    descricao: 'Aproveite o melhor do Outback Steakhouse.',
-    options: [ { brl: 50, sku: 'OUTBACK-50' }, { brl: 100, sku: 'OUTBACK-100' } ]
-  },
-  {
-    id: 'cacaushow', name: 'Cacau Show', 
-    bgColor: '#ffffff', 
-    logoUrl: 'https://logodownload.org/wp-content/uploads/2017/07/cacau-show-logo-16.png', 
-    fallbackIcon: 'fa-solid fa-cookie-bite',
-    descricao: 'Chocolates deliciosos para o seu dia.',
-    options: [ { brl: 30, sku: 'CACAU-30' }, { brl: 50, sku: 'CACAU-50' } ]
-  },
-  {
-      id: 'roblox', name: 'Roblox (Robux)', 
-      bgColor: '#000000', logoUrl: 'https://cdn.simpleicons.org/roblox/ffffff', fallbackIcon: 'fa-solid fa-gamepad',
-      descricao: 'Moeda virtual para o universo Roblox.',
-      options: [ { brl: 25, sku: 'ROBUX-25' }, { brl: 50, sku: 'ROBUX-50' } ]
-  }
-];
+window.apiGiftCardsCatalog = [];
 
 window.verificarViradaDeMesOrcamento = async function(companyId) {
 const c = companies.find(x => String(x.id) === String(companyId));
@@ -1242,15 +1238,15 @@ window.iniciarRadarNotificacoes = function() {
                   }
 
                 return `
-                <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${n.acaoAlvo}', '${n.id}')" style="padding: 15px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s;">
+                <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${escAttr(n.acaoAlvo)}', '${escAttr(n.id)}')" style="padding: 15px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s;">
                     <div style="font-size: 10px; color: var(--color-text-secondary); margin-bottom: 5px;">${new Date(n.createdAt).toLocaleString('pt-BR')}</div>
                     
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 10px;">
-                        <strong style="font-size: 13px; color: var(--color-text-primary);">${n.titulo}</strong>
+                        <strong style="font-size: 13px; color: var(--color-text-primary);">${esc(n.titulo)}</strong>
                         ${tagPerfil}
                     </div>
                     
-                    <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4;">${n.mensagem}</p>
+                    <p style="margin: 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4;">${esc(n.mensagem)}</p>
                 </div>`;
             }).join('');
         }
@@ -1290,15 +1286,15 @@ window.abrirModalTodasNotificacoes = function() {
       listaHTML = listaGlobal.map(n => {
           const cursorStyle = n.acaoAlvo ? 'cursor: pointer;' : 'cursor: default;';
           const hoverClass = n.acaoAlvo ? 'notif-item-hover' : '';
-          return `
-          <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${n.acaoAlvo}')" style="padding: 15px 20px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s; display: flex; align-items: flex-start; gap: 15px;">
+return `
+          <div class="${hoverClass}" onclick="window.abrirAbaPelaNotificacao('${escAttr(n.acaoAlvo)}')" style="padding: 15px 20px; border-bottom: 1px solid var(--color-border); background: ${n.lida ? 'transparent' : 'rgba(16, 185, 129, 0.05)'}; ${cursorStyle} transition: background 0.2s; display: flex; align-items: flex-start; gap: 15px;">
               <div style="width: 10px; height: 10px; border-radius: 50%; background: ${n.lida ? 'transparent' : 'var(--color-primary)'}; margin-top: 6px; flex-shrink: 0;"></div>
               <div style="flex-grow: 1;">
                   <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                      <strong style="font-size: 14px; color: var(--color-text-primary);">${n.titulo}</strong>
+                      <strong style="font-size: 14px; color: var(--color-text-primary);">${esc(n.titulo)}</strong>
                       <span style="font-size: 11px; color: var(--color-text-secondary); opacity: 0.8;">${new Date(n.createdAt).toLocaleString('pt-BR')}</span>
                   </div>
-                  <p style="margin: 0; font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">${n.mensagem}</p>
+                  <p style="margin: 0; font-size: 13px; color: var(--color-text-secondary); line-height: 1.4;">${esc(n.mensagem)}</p>
               </div>
           </div>`;
       }).join('');
@@ -1345,3 +1341,146 @@ window.marcarNotificacoesComoLidas = function() {
         if(contador > 0) batch.commit();
     });
 };
+
+// ==========================================
+// SISTEMA DE PATENTES (RANKS GAMIFICADOS)
+// ==========================================
+window.PATENTES = [
+    { minLevel: 1, nome: 'Recruta', imagem: 'Patentes/Recruta.svg', icone: 'fa-solid fa-seedling', cor: '#CD7F32', corSuave: '#8b4513', gradient: 'linear-gradient(135deg, #3d1f06 0%, #CD7F32 100%)' },
+    { minLevel: 3, nome: 'Aprendiz', imagem: 'Patentes/Aprendiz.svg', icone: 'fa-solid fa-book-open', cor: '#C0C0C0', corSuave: '#4a4a4a', gradient: 'linear-gradient(135deg, #2a2a2a 0%, #C0C0C0 100%)' },
+    { minLevel: 5, nome: 'Operacional', imagem: 'Patentes/Operacional.svg', icone: 'fa-solid fa-gears', cor: '#FFD700', corSuave: '#8a6d00', gradient: 'linear-gradient(135deg, #4d3d00 0%, #FFD700 100%)' },
+    { minLevel: 8, nome: 'Especialista', imagem: 'Patentes/Especialista.svg', icone: 'fa-solid fa-star', cor: '#E5E4E2', corSuave: '#7a7a7a', gradient: 'linear-gradient(135deg, #3a3a3a 0%, #E5E4E2 100%)' },
+    { minLevel: 12, nome: 'Veterano', imagem: 'Patentes/Veterano.svg', icone: 'fa-solid fa-shield-halved', cor: '#878681', corSuave: '#3a3a38', gradient: 'linear-gradient(135deg, #1a1a19 0%, #878681 100%)' },
+    { minLevel: 17, nome: 'Elite', imagem: 'Patentes/Elite.svg', icone: 'fa-solid fa-fire', cor: '#A7D8DE', corSuave: '#4a7a8a', gradient: 'linear-gradient(135deg, #2a4a5a 0%, #A7D8DE 100%)' },
+    { minLevel: 23, nome: 'Mestre', imagem: 'Patentes/Mestre.svg', icone: 'fa-solid fa-gem', cor: '#50C878', corSuave: '#1a4a2a', gradient: 'linear-gradient(135deg, #0a2a1a 0%, #50C878 100%)' },
+    { minLevel: 30, nome: 'Grão-Mestre', imagem: 'Patentes/Gr%C3%A3o-Mestre.svg', icone: 'fa-solid fa-crown', cor: '#0F52BA', corSuave: '#052a5a', gradient: 'linear-gradient(135deg, #021a3a 0%, #0F52BA 100%)' },
+    { minLevel: 40, nome: 'Lenda', imagem: 'Patentes/Lenda.svg', icone: 'fa-solid fa-bolt-lightning', cor: '#B9F2FF', corSuave: '#4a8a9a', gradient: 'linear-gradient(135deg, #2a5a6a 0%, #B9F2FF 100%)' },
+    { minLevel: 50, nome: 'Lenda Suprema', imagem: 'Patentes/Lenda%20Suprema.svg', icone: 'fa-solid fa-dragon', cor: '#E0115F', corSuave: '#5a072a', gradient: 'linear-gradient(135deg, #3a031a 0%, #E0115F 100%)' },
+];
+
+window.getPatente = function (nivel) {
+    nivel = nivel || 1;
+    let patente = window.PATENTES[0];
+    for (let i = window.PATENTES.length - 1; i >= 0; i--) {
+        if (nivel >= window.PATENTES[i].minLevel) {
+            patente = window.PATENTES[i];
+            break;
+        }
+    }
+    return patente;
+};
+
+window.getProximaPatente = function (nivel) {
+    nivel = nivel || 1;
+    for (let i = 0; i < window.PATENTES.length; i++) {
+        if (nivel < window.PATENTES[i].minLevel) {
+            return window.PATENTES[i];
+        }
+    }
+    return null;
+};
+
+window.renderPatenteBadge = function (nivel, tamanho) {
+    tamanho = tamanho || 'normal';
+    const p = window.getPatente(nivel);
+    const sizes = {
+        xsmall: { font: '9px', icon: '13px', pad: '3px 8px', gap: '5px', radius: '8px' },
+        small: { font: '11px', icon: '18px', pad: '5px 12px', gap: '8px', radius: '10px' },
+        normal: { font: '14px', icon: '26px', pad: '8px 18px', gap: '10px', radius: '12px' },
+        large: { font: '18px', icon: '36px', pad: '12px 24px', gap: '14px', radius: '18px' }
+    };
+    const s = sizes[tamanho] || sizes.normal;
+    const visualIcon = p.imagem
+        ? `<img src="${p.imagem}" style="width: ${s.icon}; height: ${s.icon}; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none'">`
+        : `<i class="${p.icone}" style="font-size: ${s.icon};"></i>`;
+    return `<span class="patente-badge" onclick="window.mostrarListaPatentes()" style="cursor:pointer;display:inline-flex;align-items:center;gap:${s.gap};background:${p.gradient};color:white;padding:${s.pad};border-radius:${s.radius};font-size:${s.font};font-weight:900;box-shadow:0 4px 15px ${p.cor}40;white-space:nowrap;text-transform:uppercase;border:1px solid rgba(255,255,255,0.2);">${visualIcon}<span style="text-shadow:0 1px 2px rgba(0,0,0,0.4);">${p.nome}</span></span>`;
+};
+
+window.mostrarListaPatentes = function () {
+    let modal = document.getElementById('modalListaPatentes');
+    if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <style>
+                #corpoListaPatentes::-webkit-scrollbar { width: 5px; }
+                #corpoListaPatentes::-webkit-scrollbar-track { background: transparent; }
+                #corpoListaPatentes::-webkit-scrollbar-thumb { background: var(--color-border, #334155); border-radius: 6px; }
+                #corpoListaPatentes::-webkit-scrollbar-thumb:hover { background: #10b981; }
+            </style>
+            <div id="modalListaPatentes" class="modal-overlay hidden" style="z-index:100000;backdrop-filter:blur(16px);background:rgba(15,23,42,0.7);display:flex;align-items:center;justify-content:center;">
+                <div style="width:100%;max-width:500px;background:var(--color-bg-secondary);border:1px solid var(--color-border);border-radius:32px;display:flex;flex-direction:column;box-shadow:0 25px 50px rgba(0,0,0,0.5);position:relative;margin:20px;overflow:hidden;">
+                    <button onclick="window.fecharModalPatentes()" style="position:absolute;top:20px;right:20px;background:var(--color-bg-primary);border:1px solid var(--color-border);width:36px;height:36px;border-radius:50%;color:var(--color-text-secondary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;"><i class="fa-solid fa-xmark"></i></button>
+                    <div style="padding:40px 30px 20px;text-align:center;">
+                        <div style="width:64px;height:64px;margin:0 auto 16px;background:rgba(16,185,129,0.15);color:#10b981;font-size:28px;display:flex;align-items:center;justify-content:center;border-radius:20px;box-shadow:0 0 30px rgba(16,185,129,0.2);"><i class="fa-solid fa-ranking-star"></i></div>
+                        <h2 style="color:var(--color-text-primary);font-size:24px;font-weight:800;margin:0 0 6px;">Hierarquia de Ranks</h2>
+                        <p style="color:var(--color-text-secondary);font-size:14px;margin:0;">Evolua sua conta e conquiste novos patamares</p>
+                    </div>
+                    <div id="corpoListaPatentes" style="padding:10px 25px 25px;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;scrollbar-color:var(--color-border, #334155) transparent;"></div>
+                    <div style="padding:20px 25px 25px;border-top:1px solid var(--color-border);">
+                        <button class="btn btn-primary" onclick="window.fecharModalPatentes()" style="width:100%;border-radius:16px;padding:18px;font-weight:800;font-size:15px;">Continuar Evoluindo</button>
+                    </div>
+                </div>
+            </div>
+        `);
+        modal = document.getElementById('modalListaPatentes');
+    }
+    const nivelAtual = (typeof currentUser !== 'undefined') ? (currentUser.level || 1) : 1;
+    let html = '';
+    window.PATENTES.forEach((p) => {
+        const bloqueado = nivelAtual < p.minLevel;
+        const eAtual = window.getPatente(nivelAtual).nome === p.nome;
+        const iconHtml = p.imagem ? `<img src="${p.imagem}" style="width:32px;height:32px;object-fit:contain;" onerror="this.style.display='none'">` : `<i class="${p.icone}" style="font-size:24px;color:white;"></i>`;
+        const reqHtml = bloqueado ? `<i class="fa-solid fa-lock" style="opacity:0.5;"></i> Requer Nível <strong style="color:var(--color-text-primary);margin-left:4px;">${p.minLevel}</strong>` : `<i class="fa-solid fa-circle-check"></i> Conquistado (Nível ${p.minLevel})`;
+        const statusHtml = bloqueado ? `<div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--color-bg-secondary);color:var(--color-text-secondary);border:1px solid var(--color-border);"><i class="fa-solid fa-lock"></i></div>` : `<div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(16,185,129,0.15);color:#10b981;"><i class="fa-solid fa-check"></i></div>`;
+        html += `<div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--color-bg-primary);border:1px solid ${eAtual ? 'rgba(16,185,129,0.4)' : 'var(--color-border)'};border-radius:20px;position:relative;${bloqueado ? 'opacity:0.5;filter:grayscale(1);' : ''}${eAtual ? 'background:rgba(16,185,129,0.08);box-shadow:0 10px 30px rgba(16,185,129,0.1);' : ''}">
+            ${eAtual ? '<div style="position:absolute;top:-10px;right:20px;background:#10b981;color:white;font-size:10px;font-weight:800;padding:4px 12px;border-radius:10px;text-transform:uppercase;">Seu Rank</div>' : ''}
+            <div style="width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 16px rgba(0,0,0,0.2);background:${p.gradient};">${iconHtml}</div>
+            <div style="flex:1;min-width:0;">
+                <h3 style="color:var(--color-text-primary);font-size:16px;font-weight:800;letter-spacing:0.5px;margin:0 0 4px;text-transform:uppercase;">${p.nome}</h3>
+                <p style="font-size:13px;color:${eAtual ? '#34d399' : 'var(--color-text-secondary)'};margin:0;display:flex;align-items:center;gap:6px;">${reqHtml}</p>
+            </div>
+            ${statusHtml}
+        </div>`;
+    });
+    document.getElementById('corpoListaPatentes').innerHTML = html;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+};
+
+window.fecharModalPatentes = function () {
+    const modal = document.getElementById('modalListaPatentes');
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = '';
+};
+
+// =========================================================
+// TRAVA DE SCROLL DO FUNDO ENQUANTO HÁ JANELA ABERTA
+// Observa todos os .modal-overlay e liga body.modal-open.
+// =========================================================
+(function () {
+  function sincronizarScrollAberto() {
+    if (!document.body) return;
+    var abertos = Array.prototype.filter.call(
+      document.querySelectorAll('.modal-overlay'),
+      function (m) { return !m.classList.contains('hidden'); }
+    );
+    document.body.classList.toggle('modal-open', abertos.length > 0);
+  }
+
+  function iniciarObservador() {
+    if (typeof MutationObserver === 'undefined') return;
+    var obs = new MutationObserver(sincronizarScrollAberto);
+    obs.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    sincronizarScrollAberto();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciarObservador);
+  } else {
+    iniciarObservador();
+  }
+})();

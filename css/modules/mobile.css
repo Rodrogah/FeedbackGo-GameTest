@@ -1,0 +1,290 @@
+/* ======================================================= */
+/* MODO MOBILE PREMIUM (CARTÕES LIMPOS & MENU NATIVO)      */
+/* ======================================================= */
+@media (max-width: 768px) {
+  /* 1. ESTRUTURA BASE E HEADER */
+  html, body { max-width: 100vw; overflow-x: hidden; background-color: var(--color-bg-primary); }
+  .app-container { flex-direction: column; padding-top: 60px; }
+  
+  .sidebar { position: static; width: 100%; height: auto; background: transparent; }
+  .sidebar-logo {
+      position: fixed; top: 0; left: 0; width: 100%; height: 60px;
+      background: #0f172a; z-index: 1001; display: flex; flex-direction: column; justify-content: center;
+      padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-bottom: none;
+  }
+  .sidebar-logo h2 { font-size: 18px; margin: 0; }
+  .sidebar-logo p { display: none; }
+
+  /* 2. MENU HAMBÚRGUER E GAVETA LATERAL */
+  .mobile-menu-toggle { display: block; background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; padding: 5px 0; }
+  .sidebar-nav {
+      position: fixed; top: 60px; left: -280px; width: 250px; height: calc(100vh - 60px);
+      background: #0f172a; z-index: 1000; display: flex; flex-direction: column;
+      padding: 15px; transition: 0.3s ease-in-out; border-right: 1px solid #1e293b;
+  }
+  .sidebar-nav.open { left: 0; box-shadow: 100vw 0 0 rgba(0,0,0,0.5); }
+  body.dark-mode .sidebar-nav { background: #1e293b; border-color: #334155; }
+  .nav-item { padding: 10px 14px; font-size: 14px; margin-bottom: 5px; border-radius: 8px; }
+
+  .sidebar-footer {
+      position: fixed; bottom: 0; left: -280px; width: 250px; background: #0f172a; z-index: 1000;
+      padding: 15px; transition: 0.3s ease-in-out; border-top: 1px solid #1e293b;
+  }
+  .sidebar-footer.open { left: 0; }
+  body.dark-mode .sidebar-footer { background: #1e293b; border-color: #334155; }
+
+  /* 3. CONTEÚDO E EMPILHAMENTO */
+  .main-content { margin-left: 0; padding: 15px; width: 100%; }
+  .card { border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+  
+  div[style*="grid-template-columns"], div[style*="display: grid"],
+  #adminConteudoDinamico > div > div, #funcConteudoDinamico > div > div {
+      display: flex !important; flex-direction: column !important; width: 100% !important; gap: 16px !important;
+  }
+  .stat-card { width: 100% !important; border-radius: 12px; }
+  canvas { width: 100% !important; height: auto !important; }
+
+  /* 4. FORMULÁRIOS, BOTÕES E FILTROS */
+  .filters { display: flex !important; flex-direction: column !important; width: 100% !important; gap: 10px !important; }
+  .filters .form-group, .form-grid .form-group { width: 100% !important; min-width: 100% !important; margin-bottom: 5px !important; }
+  input, select, textarea { padding: 12px 14px; border-radius: 10px; font-size: 16px !important; } /* 16px previne zoom no iOS */
+  .btn { padding: 12px; border-radius: 10px; font-size: 15px; }
+  .card .btn { width: 100% !important; margin-top: 8px !important; justify-content: center !important; }
+
+  /* MÁGICA DO BOTÃO CRIAR EQUIPA [+] CENTRALIZADO */
+  #newTeamForm, #addCategoryForm { display: flex !important; flex-direction: row !important; gap: 10px !important; align-items: center !important; }
+  #newTeamForm .form-group, #addCategoryForm .form-group { flex: 1 !important; margin-bottom: 0 !important; }
+  #newTeamForm input, #addCategoryForm input { height: 46px !important; margin: 0 !important; }
+  
+  #newTeamForm button, #addCategoryForm button {
+      width: 46px !important; min-width: 46px !important; height: 46px !important;
+      padding: 0 !important; margin: 0 !important; border-radius: 12px !important;
+      display: flex !important; align-items: center !important; justify-content: center !important;
+      font-size: 0 !important; line-height: 0 !important; /* Trava o alinhamento vertical */
+  }
+  #newTeamForm button::after, #addCategoryForm button::after {
+      content: '\f067'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+      font-size: 20px !important; color: white; display: block !important; margin: auto !important;
+  }
+
+  /* 5. DESIGN BASEADO NO SKETCH (MOBILE) */
+  .table-container { border: none !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; overflow: hidden !important; }
+  table, thead, tbody, th, td, tr { display: block; width: 100%; }
+  thead { display: none; }
+
+  tr {
+      background: var(--color-bg-secondary); margin-bottom: 15px; border-radius: 12px;
+      border: 1px solid var(--color-border); padding: 16px !important; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
+      
+      /* O "MOTOR" QUE REORGANIZA OS ELEMENTOS */
+      display: grid !important;
+      grid-template-columns: 1fr auto; /* Coluna 1 cresce, Coluna 2 ajusta ao status */
+      grid-template-areas:
+          "membro membro"
+          "data data"
+          "categoria status"
+          "titulo titulo"
+          "detalhes detalhes"
+          "acoes acoes";
+      row-gap: 8px; column-gap: 15px; align-items: center;
+  }
+  body.dark-mode tr { background: #1e293b; border-color: #334155; }
+
+  td {
+      border: none !important; padding: 0 !important; display: block !important;
+      font-size: 14px; color: var(--color-text-secondary); line-height: 1.4;
+      white-space: normal !important; word-break: break-word; text-align: left !important;
+  }
+
+  /* MAPEAR CADA PEÇA NO LUGAR DESENHADO */
+  .td-membro { 
+    grid-area: membro; font-size: 15px; margin-bottom: 2px;
+    border-bottom: none !important; padding-bottom: 0 !important; 
+  }
+  body.dark-mode .td-membro { border-bottom: none !important; }
+  
+  .td-data { grid-area: data; font-size: 13px; margin-bottom: 4px; }
+  
+  .td-categoria { grid-area: categoria; }
+  
+  /* Empurra o Status para a direita */
+  .td-status { grid-area: status; justify-self: end; }
+  
+  .td-titulo { 
+      grid-area: titulo; font-size: 16px; margin-top: 8px;
+      border-bottom: none !important; padding-bottom: 0 !important; 
+  }
+  body.dark-mode .td-titulo { border-bottom: none !important; }
+  
+  .td-detalhes { grid-area: detalhes; padding-top: 4px !important; }
+  
+  /* Área de Ações */
+  .td-acoes {
+      grid-area: acoes; margin-top: 10px; padding-top: 5px !important; 
+      border-top: none !important;
+      display: flex !important; flex-direction: row !important; justify-content: flex-end !important; gap: 10px !important;
+  }
+  body.dark-mode .td-acoes { border-top: none !important; }
+  
+  /* Ajustes Finos de Fonte */
+  td strong { color: var(--color-text-primary); font-weight: 700; }
+  .badge { display: inline-flex; margin-top: 0; }
+  .btn-icon-only { padding: 8px 12px !important; font-size: 14px !important; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 6px; }
+  body.dark-mode .btn-icon-only { background: #0f172a; border-color: #334155; }
+
+  /* 6. MÁGICA DAS CONFIGURAÇÕES (DRILL-DOWN APP NATIVO) */
+  .settings-layout-grid { display: block !important; }
+  .settings-nav-list { display: flex; flex-direction: column; gap: 10px; }
+  .settings-nav-list.mobile-hidden { display: none !important; }
+  
+  .settings-content-area { display: none; }
+  .settings-content-area.mobile-active { display: block !important; animation: slideInApp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+  /* Estilo do Botão Voltar Injetado pelo JS */
+  .btn-mobile-back {
+      display: flex !important; align-items: center; gap: 10px; color: var(--color-text-primary);
+      background: transparent; border: none; font-size: 18px; font-weight: 700;
+      padding: 0 0 16px 0; margin-bottom: 24px; border-bottom: 1px solid var(--color-border);
+      width: 100%; cursor: pointer; text-align: left;
+  }
+  body.dark-mode .btn-mobile-back { color: #f8fafc; border-bottom-color: #334155; }
+  
+  @keyframes slideInApp { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* 7. MODAIS GERAIS (Popups) */
+  .modal-overlay { padding: 15px !important; box-sizing: border-box !important; align-items: center; }
+  .modal-content {
+      width: 100% !important; max-width: 100vw !important; height: auto !important; max-height: 90vh !important;
+      overflow-y: auto !important; margin: 0 !important; border-radius: 20px !important; padding: 24px !important;
+  }
+
+  /* Preparar o Botão (A Caixa Quadrada) */
+  #newTeamForm button, 
+  #addCategoryForm button {
+      width: 38px !important; 
+      min-width: 38px !important;
+      height: 38px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      position: relative !important; 
+      border-radius: 8px !important;
+      border: none !important;
+      background-color: var(--color-success) !important;
+      font-size: 0 !important; 
+      color: transparent !important;
+      overflow: hidden !important;
+  }
+
+  /* Injetar e Centralizar o [+] (O Ícone) */
+  #newTeamForm button::after, 
+  #addCategoryForm button::after {
+      content: '\f067'; /* fa-plus */
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      color: white;
+      font-size: 16px !important; 
+      position: absolute !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      line-height: 1 !important;
+      display: block !important;
+      margin: 0 !important;
+  }
+
+  /* DESTRUIÇÃO TOTAL DE LINHAS NOS CARTÕES MOBILE */
+  td, 
+  table td, 
+  tr td, 
+  body.dark-mode td,
+  body.dark-mode table td, 
+  body.dark-mode tr td,
+  .td-membro, .td-titulo, .td-acoes {
+      border: none !important;
+      border-bottom: none !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
+  }
+
+  /* DESTRUIÇÃO DA CAIXA DE 90 GRAUS (TABLE CONTAINER) */
+  body .table-container,
+  body.dark-mode .table-container {
+      background: transparent !important;
+      background-color: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+  }
+
+  .form-grid-spaced { grid-template-columns: 1fr; gap: 30px; }
+
+  .teams-modal-body { grid-template-columns: 1fr; }
+  .teams-sidebar { border-left: none; border-top: 1px solid var(--color-border); }
+}
+
+/* ======================================================= */
+/* BLINDAGEM DO COMPUTADOR (PC) - PROTEGE AS CONFIGURAÇÕES */
+/* ======================================================= */
+@media (min-width: 769px) {
+  .settings-content-area {
+      display: block !important;
+  }
+
+  .settings-nav-list,
+  .settings-nav-list.mobile-hidden {
+      display: flex !important;
+  }
+
+  .btn-mobile-back {
+      display: none !important;
+  }
+}
+
+/* ======================================================= */
+/* 🚀 BLINDAGEM DE TOQUE E SCROLL (CORREÇÃO MOBILE FINAL)  */
+/* ======================================================= */
+
+/* 1. Liberta o ecrã tátil do bloqueio do iOS */
+html, body {
+  overflow-x: visible !important; /* Remove o bloqueio do iPhone */
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: auto !important; 
+}
+
+/* Movemos o corte da tela para o container interno, salvando os toques */
+.app-container {
+  overflow-x: hidden !important;
+  width: 100vw;
+  max-width: 100%;
+}
+
+/* 2. Anula a obrigatoriedade de "Duplo Clique" no telemóvel (Bug do Hover) */
+@media (hover: none) {
+  .btn:hover, .nav-item:hover, .btn-icon-only:hover, .download-card-teams:hover, .green-dot-item:hover, .file-drop-area:hover {
+      transform: none !important;
+      box-shadow: none !important;
+      background-color: inherit; /* Ignora a mudança de cor no 1º toque */
+  }
+}
+
+/* 3. Resposta Imediata aos cliques e prevenção de seleção de texto acidental */
+button, a, input[type="button"], select, .nav-item, .btn-icon-only, .file-drop-area, .green-dot-item, .tab-btn, .close-modal {
+  touch-action: manipulation !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important; /* Remove o piscar cinzento no Android */
+  user-select: none !important; /* Evita a lupa de texto ao tocar rápido */
+}
+
+/* Permite selecionar texto apenas onde deve ser permitido */
+input[type="text"], input[type="email"], input[type="password"], textarea, p, h1, h2, h3, span {
+  user-select: auto;
+}
+
+/* 4. Corrige o espaço gigante duplo nas Configurações do telemóvel */
+.main-content .app-container {
+  padding-top: 0 !important;
+  min-height: auto !important;
+}

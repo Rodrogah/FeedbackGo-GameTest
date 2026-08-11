@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FeedbackGo</string>
+    <string name="title_activity_main">FeedbackGo</string>
+    <string name="package_name">com.rodrigo.feedbackgo</string>
+    <string name="custom_url_scheme">com.rodrigo.feedbackgo</string>
+</resources>

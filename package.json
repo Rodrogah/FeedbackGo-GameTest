@@ -1,9 +1,9 @@
 {
     "scripts": {
-      "start": "servor --reload"
+        "start": "servor --reload"
     },
     "dependencies": {
-      "servor": "^4.0.2"
+        "opencode-skills-collection": "^4.0.27",
+        "servor": "^4.0.2"
     }
-  }
-  
+}

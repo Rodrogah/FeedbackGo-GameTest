@@ -1,0 +1,171 @@
+/* ============ LAYOUT DE CONFIGURAÇÕES (RESOLVIDO) ============ */
+
+#adminSettings:not(.hidden),
+#employeeSettings:not(.hidden) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  width: 100%;
+  padding: 30px !important;
+}
+
+/* Quando o JS esconde, esconde mesmo! */
+#adminSettings.hidden,
+#employeeSettings.hidden {
+  display: none !important;
+}
+
+#adminSettings .section-header,
+#employeeSettings .section-header {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 15px;
+}
+
+/* FORÇAR A TRANSPARÊNCIA NAS CAIXAS ESTRUTURAIS */
+#adminSettings.app-container,
+#employeeSettings.app-container,
+.settings-layout-grid,
+.settings-nav-list,
+.settings-content-area,
+.centered-content-box {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* GRID E MENU */
+.settings-layout-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 40px;
+  align-items: start;
+  width: 100%;
+}
+
+.settings-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.nav-list-item {
+  text-align: left;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-list-item i {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+.nav-list-item:hover {
+  background-color: #f1f5f9;
+  color: #10b981;
+}
+.nav-list-item.active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* OCULTAR ABAS INATIVAS */
+.settings-tab-content:not([style*='display: block']) {
+  display: none !important;
+}
+.settings-tab-content {
+  width: 100%;
+}
+.centered-content-box {
+  max-width: 650px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ======================================================= */
+/* CHAVINHA DE TEMA - VERSÃO FINAL SEM SALTOS              */
+/* ======================================================= */
+.theme-switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  margin: 15px 0;
+  transition: background 0.3s ease;
+}
+
+.theme-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Fixa a largura do texto para o botão não pular */
+  min-width: 140px; 
+}
+
+/* Cor do texto: Forçamos branco no Dark Mode para não sumir */
+#themeSwitchText {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b; /* Cor no modo claro */
+}
+
+#themeSwitchIcon {
+  font-size: 18px;
+  width: 20px;
+  text-align: center;
+}
+
+/* A estrutura da chavinha (Switch) */
+.theme-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0; /* Impede que a chavinha esmague */
+}
+
+.theme-switch input { opacity: 0; width: 0; height: 0; }
+
+.theme-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 34px;
+}
+
+.theme-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+.theme-switch input:checked + .theme-slider {
+  background-color: #10b981 !important; /* Verde Sucesso */
+}
+
+.theme-switch input:checked + .theme-slider:before {
+  transform: translateX(22px);
+}
